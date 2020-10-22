@@ -109,11 +109,11 @@ func (wts WorkerTasks) String() string {
 */
 
 // Execute function returns a chan that receives the Results of the workers for the input Requests.
-func Execute(ctx context.Context, workers []*Worker, tasks WorkerTasks) (chan Result, error) {
+func Execute(ctx context.Context, workers []*Worker, tasks WorkerTasks, mode Mode) (chan Result, error) {
 	eng, err := NewEngine(ctx, workers, tasks)
 	if err != nil {
 		return nil, err
 	}
 
-	return eng.Execute()
+	return eng.Execute(mode)
 }

@@ -6,6 +6,25 @@ import (
 	"sync"
 )
 
+// Mode of execution for each task
+type Mode int
+
+// Values of engine mode execution for each task
+const (
+	// For each task returns only one result:
+	// the first success or the last error.
+	FirstSuccessOrLastError Mode = iota
+
+	// For each task returns the result of all the workers:
+	// after the first success the other requests are cancelled.
+	// TODO: at most one success is expected (TBV)
+	FirstSuccessThenCancel
+
+	// For each task returns the result of all the workers.
+	// Multiple success results can be returned.
+	All
+)
+
 // Engine is ...
 type Engine struct {
 	workers map[WorkerID]*Worker
@@ -135,28 +154,22 @@ func (eng *Engine) createWorkerRequestChan(wid WorkerID) chan *workerRequest {
 	return out
 }
 
-// getFirstSuccessResultIfAny send to the out channel a single result for the job task.
-// It is the first success response or the last response (success or error).
-func (tidctx *taskIDContext) getFirstSuccessResultIfAny(out chan Result) {
+// getFirstSuccessOrLastError send to the out channel a single result for the taskIDContext.
+// It is the first success response or the last error response.
+func getFirstSuccessOrLastError(tidctx *taskIDContext, out chan Result) {
 	todo := true
 	count := tidctx.workers
 
 	for ; count > 0; count-- {
-
 		select {
 		case res := <-tidctx.resChan:
 			// if not already done,
 			// send the result if Success,
 			// or if it is the last result.
-
-			fmt.Print(res)
-
 			if todo && (res.Success() || count == 1) {
 				todo = false
 				tidctx.cancel()
 				out <- res
-				// XXX: inserted return statement: check it!!!
-				//return
 			}
 		case <-tidctx.ctx.Done():
 			tidctx.cancel()
@@ -164,9 +177,10 @@ func (tidctx *taskIDContext) getFirstSuccessResultIfAny(out chan Result) {
 	}
 }
 
-// getAllFirstSuccessResultIfAny send to the out channel a single result for the job task.
-// It is the first success response or the last response (success or error).
-func (tidctx *taskIDContext) getAllFirstSuccessResultIfAny(out chan Result) {
+// getFirstSuccessThenCancel returns all the results:
+// after the first success the other requests are cancelled.
+// TODO: at most one success is expected (TBV)
+func getFirstSuccessThenCancel(tidctx *taskIDContext, out chan Result) {
 	todo := true
 	count := tidctx.workers
 
@@ -182,22 +196,9 @@ func (tidctx *taskIDContext) getAllFirstSuccessResultIfAny(out chan Result) {
 	}
 }
 
-// // getAllFirstSuccessResultIfAny send to the out channel a single result for the job task.
-// // It is the first success response or the last response (success or error).
-// func (tidctx *taskIDContext) DONOTWORK_getAllFirstSuccessResultIfAny(out chan Result) {
-// 	todo := true
-
-// 	// it doesn't work, because resChan it is never closed, I suppose...
-// 	for res := range tidctx.resChan {
-// 		if todo && res.Success() {
-// 			todo = false
-// 			tidctx.cancel()
-// 		}
-// 		out <- res
-// 	}
-// }
-
-func (tidctx *taskIDContext) getAllResults(out chan Result) {
+// getAll returns the result of all the workers.
+// Multiple success results can be returned.
+func getAllResults(tidctx *taskIDContext, out chan Result) {
 	count := tidctx.workers
 
 	for ; count > 0; count-- {
@@ -212,10 +213,31 @@ func (tidctx *taskIDContext) getAllResults(out chan Result) {
 }
 
 // Execute returns a chan that receives the Results of the workers for the input Requests.
-func (eng *Engine) Execute() (chan Result, error) {
+func (eng *Engine) Execute(mode Mode) (chan Result, error) {
 
 	if eng == nil {
 		return nil, fmt.Errorf("Engine is nil")
+	}
+
+	//
+
+	// // the first success or the last error.
+	// FirstSuccessOrLastError Mode = iota
+
+	// // For each task returns the result of all the workers:
+	// // after the first success the other requests are cancelled.
+	// // TODO: at most one success is expected (TBV)
+	// FirstSuccessThenCancel
+
+	// // For each task returns the result of all the workers.
+	// // Multiple success results can be returned.
+	// All
+	type fnGetResults func(tidctx *taskIDContext, out chan Result)
+
+	arrGetResults := []fnGetResults{
+		getFirstSuccessOrLastError,
+		getFirstSuccessThenCancel,
+		getAllResults,
 	}
 
 	// Creates the output channel
@@ -224,11 +246,10 @@ func (eng *Engine) Execute() (chan Result, error) {
 	// Starts a goroutine for each different TaskID to wait for the result
 	var wg sync.WaitGroup
 	wg.Add(len(eng.tidctxs))
+	getResults := arrGetResults[mode]
 	for _, t := range eng.tidctxs {
 		go func(tidctx *taskIDContext) {
-			// tidctx.getFirstSuccessResultIfAny(out)
-			// tidctx.getAllResults(out)
-			tidctx.getAllFirstSuccessResultIfAny(out)
+			getResults(tidctx, out)
 			wg.Done()
 		}(t)
 	}
@@ -257,6 +278,12 @@ func (eng *Engine) Execute() (chan Result, error) {
 				for req := range reqc {
 					// send the worker result of the task,
 					// to the response chan of the task
+					if req == nil {
+						fmt.Println("???")
+					}
+					if req.resChan == nil {
+						fmt.Println("???")
+					}
 					req.resChan <- w.Work(req.ctx, workerInst, req.task)
 				}
 			}(worker, i, wreqChan)

@@ -9,6 +9,7 @@
 		"version": "0.2.0",
 		"configurations": [		
 
+
 		
 			{
 				"name": "Launch",
@@ -35,7 +36,18 @@
 				"mode": "auto",
 				"program": "${workspaceFolder}/main.go",
 				"env": {"HTTPS_PROXY": "socks5://127.0.0.1:9050"},
-				"args": ["get", "ISIN00000001","--tor", "-w", "3", "-s", "cippa:2, lippa, pluto/10"]
-			}		]
+				"args": ["get", "ISIN00000001","--config", ".quote.yaml",  
+					"--tor", "--dry-run", "-s", "cippa:2, lippa, pluto/10"]
+			},		
+			{
+				"name": "Get+Config",
+				"type": "go",
+				"request": "launch",
+				"mode": "auto",
+				"program": "${workspaceFolder}/main.go",
+				"env": {"HTTPS_PROXY": "socks5://127.0.0.1:9050"},
+				"args": ["get", "--config", ".quote.yaml"]
+			}		
+		]
 	}
 }

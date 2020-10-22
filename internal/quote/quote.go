@@ -76,10 +76,11 @@ func (t *taskGetQuote) TaskID() taskengine.TaskID {
 
 type resultGetQuote struct {
 	*quotegetter.Result
-	ScraperInst int
-	TimeStart   time.Time
-	TimeEnd     time.Time
-	Err         error
+	ScraperInst int       `json:"scraper_inst"`
+	TimeStart   time.Time `json:"time_start"`
+	TimeEnd     time.Time `json:"time_end"`
+	Err         error     `json:"-"`
+	ErrMsg      string    `json:"error"`
 }
 
 func (r *resultGetQuote) Success() bool {
@@ -211,6 +212,7 @@ func Get(isins []string, sources []string, workers []int) error {
 				TimeStart:   time1,
 				TimeEnd:     time2,
 				Err:         err,
+				ErrMsg:      err.Error(),
 			}
 			return r
 		}
@@ -228,7 +230,7 @@ func Get(isins []string, sources []string, workers []int) error {
 
 	wts.SortTasks()
 
-	resChan, err := taskengine.Execute(context.Background(), ws, wts)
+	resChan, err := taskengine.Execute(context.Background(), ws, wts, taskengine.FirstSuccessOrLastError)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+
+	"github.com/mmbros/quote/internal/quote"
 	"github.com/spf13/cobra"
 )
 
@@ -11,7 +14,7 @@ var sourcesCmd = &cobra.Command{
 	Long:    `Show available sources.`,
 	Aliases: []string{"list"},
 	Run: func(cmd *cobra.Command, args []string) {
-		//		fmt.Println(sources.Names())
+		fmt.Println(quote.Sources())
 	},
 }
 

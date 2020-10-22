@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 type testCaseTask struct {
@@ -71,7 +72,7 @@ func (a simpleResults) Len() int      { return len(a) }
 func (a simpleResults) Swap(i, j int) { a[i], a[j] = a[j], a[i] }
 func (a simpleResults) Less(i, j int) bool {
 	return (a[i].taskid < a[j].taskid) ||
-		(a[i].workerid < a[j].workerid)
+		(a[i].taskid == a[j].taskid && a[i].workerid < a[j].workerid)
 }
 
 // newTestWorkeridTasks creates a WorkerTasks object from a map workerId -> [taskId1, taskId2, ...]
@@ -139,7 +140,7 @@ func TestTasksString(t *testing.T) {
 
 }
 */
-func TestExecute(t *testing.T) {
+func TestExecuteFirstSuccessOrLastError(t *testing.T) {
 	workers := []*Worker{
 		{"w1", 1, workFn},
 		{"w2", 1, workFn},
@@ -233,12 +234,9 @@ func TestExecute(t *testing.T) {
 	// 	}),
 	// }
 	for title, tc := range testCases {
-		if title != "w3-t3 ko" {
-			continue
-		}
 		tasks := newTestWorkeridTasks(t, tc.input)
 		ctx := context.Background()
-		out, err := Execute(ctx, workers, tasks)
+		out, err := Execute(ctx, workers, tasks, FirstSuccessOrLastError)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -275,7 +273,7 @@ func TestExecute(t *testing.T) {
 	// t.FailNow()
 }
 
-func TestExecuteDone(t *testing.T) {
+func TestExecuteFirstSuccessThenCancel(t *testing.T) {
 	workers := []*Worker{
 		{"w1", 1, workFn},
 		{"w2", 1, workFn},
@@ -296,6 +294,81 @@ func TestExecuteDone(t *testing.T) {
 			},
 			expected: simpleResults{
 				{"t1", "w3", true},
+				{"t1", "w2", false},
+				{"t1", "w1", false},
+			},
+		},
+		"two ok": {
+			input: map[string][]testCaseTask{
+				"w1": {{"t1", 300, true}},
+				"w2": {{"t1", 200, true}},
+				"w3": {{"t1", 100, false}},
+			},
+			expected: simpleResults{
+				{"t1", "w3", false},
+				{"t1", "w2", true},
+				{"t1", "w1", false},
+			},
+		},
+	}
+
+	// NOTE: it is important to use *simpleResult and not simpleResult
+	lessFunc := func(a, b *simpleResult) bool {
+		return (a.taskid < b.taskid) ||
+			(a.taskid == b.taskid && a.workerid < b.workerid) ||
+			(a.taskid == b.taskid && a.workerid == b.workerid && !a.success)
+	}
+
+	for title, tc := range testCases {
+
+		tasks := newTestWorkeridTasks(t, tc.input)
+		ctx := context.Background()
+		out, err := Execute(ctx, workers, tasks, FirstSuccessThenCancel)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+
+		results := simpleResults{}
+
+		for res := range out {
+			tres := res.(*testResult)
+			results = append(results, tres.Simple())
+			// t.Logf("RESULT: (%s, %s) -> %s - %s", tres.taskid, tres.workerid, tres.result, tres.Status())
+
+		}
+
+		copts := cmp.Options{
+			cmpopts.SortSlices(lessFunc),
+		}
+		if diff := cmp.Diff(tc.expected, results, copts); diff != "" {
+			t.Errorf("%s: mismatch (-want +got):\n%s", title, diff)
+		}
+	}
+}
+
+func TestExecuteAll(t *testing.T) {
+	workers := []*Worker{
+		{"w1", 1, workFn},
+		{"w2", 1, workFn},
+		{"w3", 1, workFn},
+	}
+
+	type testCase struct {
+		input    map[string][]testCaseTask
+		expected simpleResults
+	}
+
+	testCases := map[string]testCase{
+		"all ok": {
+			input: map[string][]testCaseTask{
+				"w1": {{"t1", 300, true}},
+				"w2": {{"t1", 200, true}},
+				"w3": {{"t1", 100, true}},
+			},
+			expected: simpleResults{
+				{"t1", "w3", true},
+				{"t1", "w2", true},
+				{"t1", "w1", true},
 			},
 		},
 	}
@@ -304,7 +377,7 @@ func TestExecuteDone(t *testing.T) {
 
 		tasks := newTestWorkeridTasks(t, tc.input)
 		ctx := context.Background()
-		out, err := Execute(ctx, workers, tasks)
+		out, err := Execute(ctx, workers, tasks, All)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
@@ -321,7 +394,5 @@ func TestExecuteDone(t *testing.T) {
 		if diff := cmp.Diff(tc.expected, results, nil); diff != "" {
 			t.Errorf("%s: mismatch (-want +got):\n%s", title, diff)
 		}
-
-		t.Fail()
 	}
 }
