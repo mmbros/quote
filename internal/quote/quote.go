@@ -212,7 +212,9 @@ func Get(isins []string, sources []string, workers []int) error {
 				TimeStart:   time1,
 				TimeEnd:     time2,
 				Err:         err,
-				ErrMsg:      err.Error(),
+			}
+			if err != nil {
+				r.ErrMsg = err.Error()
 			}
 			return r
 		}
