@@ -4,8 +4,11 @@
 *.dll
 *.so
 *.dylib
+
 quote
 main
+*.db
+*.sqlite?
 
 # Test binary, built with `go test -c`
 *.test

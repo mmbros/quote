@@ -44,6 +44,7 @@ See 'quote sources' for a list of the available sources.
 		if err != nil {
 			return err
 		}
+		database := vip.GetString("database")
 
 		// handle --dry-run flag
 		if vip.GetBool(nameDruRun) {
@@ -55,6 +56,7 @@ See 'quote sources' for a list of the available sources.
   tor: %v
 `, isins, sources, workers, defaultWorkers, torIsMandatory)
 
+			fmt.Printf("database: %s\n", database)
 			return nil
 		}
 
@@ -70,7 +72,7 @@ See 'quote sources' for a list of the available sources.
 		}
 
 		// retrieves the quotes
-		return quote.Get(isins, sources, workers)
+		return quote.Get(isins, sources, workers, database)
 	},
 
 	Example: `    quote get -i isin1,isin2 -s sourceA/4,sourceB, -s sourceC --workers 2

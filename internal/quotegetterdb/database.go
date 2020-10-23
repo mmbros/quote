@@ -1,6 +1,7 @@
 package quotegetterdb
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
 	"time"
@@ -16,15 +17,35 @@ type QuoteDatabase struct {
 
 // QuoteRecord is the record stored in the quote database.
 type QuoteRecord struct {
-	id        int
-	isin      string
-	source    string
-	timestamp time.Time
-	date      time.Time
-	price     float32
-	currency  string
-	url       string
-	errmsg    string
+	ID        int
+	Isin      string
+	Source    string
+	Timestamp time.Time
+	Date      time.Time
+	Price     float32
+	Currency  string
+	URL       string
+	ErrMsg    string
+}
+
+func (qr *QuoteRecord) String() string {
+	var buf bytes.Buffer
+
+	buf.WriteString(fmt.Sprintf("{id=%d, isin=%q, source=%q", qr.ID, qr.Isin, qr.Source))
+	if !qr.Date.IsZero() {
+		buf.WriteString(fmt.Sprintf(", date=%s", qr.Date.Format("2006-01-02")))
+	}
+	if len(qr.Currency) > 0 {
+		buf.WriteString(fmt.Sprintf(", price=%.3f %s", qr.Price, qr.Currency))
+	}
+	if len(qr.URL) > 0 {
+		buf.WriteString(fmt.Sprintf(", url=%q", qr.URL))
+	}
+	if len(qr.ErrMsg) > 0 {
+		buf.WriteString(fmt.Sprintf(", err=%q", qr.ErrMsg))
+	}
+	buf.WriteString("}")
+	return buf.String()
 }
 
 type errorQuoteDatabase struct {
@@ -177,7 +198,7 @@ source TEXT NOT NULL,
 datestamp DATETIME NOT NULL,
 timestamp DATETIME NOT NULL,
 date DATE NOT NULL,
-price FLOAT,
+price DOUBLE,
 currency TEXT,
 url TEXT,
 errmsg TEXT
@@ -240,7 +261,7 @@ errmsg
 	defer stmt.Close()
 
 	for _, i := range items {
-		timestamp := i.timestamp
+		timestamp := i.Timestamp
 		if timestamp.IsZero() {
 			timestamp = time.Now()
 		}
@@ -248,12 +269,12 @@ errmsg
 		year, month, day := timestamp.Date()
 		datestamp := time.Date(year, month, day, 0, 0, 0, 0, timestamp.Location())
 
-		_, err = stmt.Exec(datestamp, timestamp, i.isin, i.source,
-			i.date, // ToNullTime(i.date),
-			ToNullFloat64(float64(i.price)),
-			ToNullString(i.currency),
-			ToNullString(i.url),
-			ToNullString(i.errmsg))
+		_, err = stmt.Exec(datestamp, timestamp, i.Isin, i.Source,
+			i.Date, // ToNullTime(i.date),
+			ToNullFloat64(float64(i.Price)),
+			ToNullString(i.Currency),
+			ToNullString(i.URL),
+			ToNullString(i.ErrMsg))
 		if err != nil {
 			return newError("Insert quote", err)
 		}
@@ -323,8 +344,8 @@ order by q.isin, q.source, q.timestamp desc
 			// date                  sql.NullTime
 		)
 		r := &QuoteRecord{}
-		err = rows.Scan(&r.id, &r.timestamp, &r.isin, &r.source,
-			&r.date, &price, &currency, &url, &errmsg)
+		err = rows.Scan(&r.ID, &r.Timestamp, &r.Isin, &r.Source,
+			&r.Date, &price, &currency, &url, &errmsg)
 		if err != nil {
 			return nil, newError("Select last quotes", err)
 		}
@@ -332,16 +353,16 @@ order by q.isin, q.source, q.timestamp desc
 		// 	r.date = date.Time
 		// }
 		if price.Valid {
-			r.price = float32(price.Float64)
+			r.Price = float32(price.Float64)
 		}
 		if currency.Valid {
-			r.currency = currency.String
+			r.Currency = currency.String
 		}
 		if url.Valid {
-			r.url = url.String
+			r.URL = url.String
 		}
 		if errmsg.Valid {
-			r.errmsg = errmsg.String
+			r.ErrMsg = errmsg.String
 		}
 
 		result = append(result, r)

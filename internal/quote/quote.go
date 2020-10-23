@@ -3,14 +3,18 @@ package quote
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"time"
 
+	"github.com/mmbros/quote/internal/htmlquotescraper"
 	"github.com/mmbros/quote/internal/htmlquotescraper/fondidocit"
 	"github.com/mmbros/quote/internal/htmlquotescraper/fundsquarenet"
 	"github.com/mmbros/quote/internal/htmlquotescraper/morningstarit"
 	"github.com/mmbros/quote/internal/quotegetter"
+	"github.com/mmbros/quote/internal/quotegetterdb"
 	"github.com/mmbros/quote/pkg/taskengine"
 )
 
@@ -163,8 +167,57 @@ func (r *resultGetQuote) Success() bool {
 // 	return nil
 // }
 
+func dbInsert(dbpath string, results []*resultGetQuote) {
+	if len(dbpath) == 0 {
+		return
+	}
+
+	// save to database
+	db, err := quotegetterdb.Open(dbpath)
+	if db != nil {
+		defer db.Close()
+		qrs := make([]*quotegetterdb.QuoteRecord, 0, len(results))
+
+		for _, r := range results {
+			var qr *quotegetterdb.QuoteRecord
+
+			if r.Err != nil {
+				if e, ok := r.Err.(*htmlquotescraper.Error); ok {
+					// skip context.Canceled errors
+					if !errors.Is(e, context.Canceled) {
+						qr = &quotegetterdb.QuoteRecord{
+							Isin:   e.Isin,
+							Source: e.Name,
+							URL:    e.URL,
+							ErrMsg: r.ErrMsg,
+						}
+					}
+				}
+			}
+			if r.Result != nil {
+				qr = &quotegetterdb.QuoteRecord{
+					Isin:     r.Isin,
+					Source:   r.Name,
+					Price:    r.Price,
+					Currency: r.Currency,
+					Date:     r.Date,
+					URL:      r.URL,
+					ErrMsg:   r.ErrMsg,
+				}
+			}
+			if (qr != nil) && (len(qr.Isin) > 0) && (len(qr.Source) > 0) {
+				qrs = append(qrs, qr)
+			}
+		}
+		err = db.InsertQuotes(qrs...)
+	}
+	if err != nil {
+		log.Print(err)
+	}
+}
+
 // Get is ..
-func Get(isins []string, sources []string, workers []int) error {
+func Get(isins []string, sources []string, workers []int, dbpath string) error {
 
 	lenWorkers1 := len(workers) - 1
 	getSourceWorkers := func(idx int) int {
@@ -232,7 +285,7 @@ func Get(isins []string, sources []string, workers []int) error {
 
 	wts.SortTasks()
 
-	resChan, err := taskengine.Execute(context.Background(), ws, wts, taskengine.FirstSuccessOrLastError)
+	resChan, err := taskengine.Execute(context.Background(), ws, wts, taskengine.FirstSuccessThenCancel)
 	if err != nil {
 		return err
 	}
@@ -242,6 +295,9 @@ func Get(isins []string, sources []string, workers []int) error {
 		res := r.(*resultGetQuote)
 		results = append(results, res)
 	}
+
+	// save to database, if not empty
+	dbInsert(dbpath, results)
 
 	json, err := json.MarshalIndent(results, "", " ")
 	if err != nil {
