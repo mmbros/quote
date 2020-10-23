@@ -278,12 +278,6 @@ func (eng *Engine) Execute(mode Mode) (chan Result, error) {
 				for req := range reqc {
 					// send the worker result of the task,
 					// to the response chan of the task
-					if req == nil {
-						fmt.Println("???")
-					}
-					if req.resChan == nil {
-						fmt.Println("???")
-					}
 					req.resChan <- w.Work(req.ctx, workerInst, req.task)
 				}
 			}(worker, i, wreqChan)
