@@ -76,7 +76,7 @@ func (t *taskGetQuote) TaskID() taskengine.TaskID {
 
 type resultGetQuote struct {
 	*quotegetter.Result
-	ScraperInst int       `json:"scraper_inst"`
+	ScraperInst int       `json:"instance"`
 	TimeStart   time.Time `json:"time_start"`
 	TimeEnd     time.Time `json:"time_end"`
 	Err         error     `json:"-"`

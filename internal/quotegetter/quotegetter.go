@@ -13,10 +13,10 @@ type QuoteGetter interface {
 
 // Result represents the info returned by the GetQuote function
 type Result struct {
-	Name     string
-	Isin     string
-	URL      string
-	Price    float32
-	Currency string
-	Date     time.Time
+	Name     string    `json:"source"`
+	Isin     string    `json:"isin"`
+	URL      string    `json:"url"`
+	Price    float32   `json:"price"`
+	Currency string    `json:"currency"`
+	Date     time.Time `json:"date"`
 }
