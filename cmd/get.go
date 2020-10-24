@@ -45,18 +45,20 @@ See 'quote sources' for a list of the available sources.
 			return err
 		}
 		database := vip.GetString("database")
+		proxy := vip.GetString("proxy")
 
 		// handle --dry-run flag
 		if vip.GetBool(nameDruRun) {
 			fmt.Printf(`quote get:
-  isins: %v
-  sources: %v
-  workers: %v
+  isins:          %v
+  sources:        %v
+  workers:        %v
   defaultWorkers: %d
-  tor: %v
-`, isins, sources, workers, defaultWorkers, torIsMandatory)
+  tor:            %v
+  proxy:          %s
+  database:       %s
+`, isins, sources, workers, defaultWorkers, torIsMandatory, proxy, database)
 
-			fmt.Printf("database: %s\n", database)
 			return nil
 		}
 

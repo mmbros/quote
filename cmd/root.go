@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/mmbros/quote/internal/quote"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -20,6 +21,11 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+
+		// handle --proxy flag
+		quote.InitClient(viper.GetViper().GetString("proxy"))
+	},
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.

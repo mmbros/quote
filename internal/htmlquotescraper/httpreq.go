@@ -7,82 +7,38 @@ import (
 	"time"
 )
 
-// doHTTPRequest executes the http request.
-// It cancels the request in case the `ctx` is cancelled.
-func doHTTPRequest(req *http.Request) (*http.Response, error) {
+// Client is the http.Client used for the quote requests.
+var Client *http.Client
 
-	// Specify proxy ip and port
-	var theProxy string = "socks5://127.0.0.1:9050"
+func init() {
+	Client = DefaultClient("")
+}
 
-	// make the request
+// DefaultClient xxx
+func DefaultClient(proxy string) *http.Client {
 	// tr := &http.Transport{}
 	tr := http.DefaultTransport.(*http.Transport).Clone()
 
-	if len(theProxy) > 0 {
+	if len(proxy) > 0 {
 		// Parse proxy URL string to a URL type
-		proxyURL, err := url.Parse(theProxy)
+		proxyURL, err := url.Parse(proxy)
 		if err != nil {
-			panic(fmt.Sprintf("Error parsing proxy URL: %q. %v", theProxy, err))
+			panic(fmt.Sprintf("Error parsing proxy URL: %q. %v", proxy, err))
 		}
 		tr.Proxy = http.ProxyURL(proxyURL)
-
 	}
 
-	client := &http.Client{
+	return &http.Client{
 		Transport: tr,
 		Timeout:   10 * time.Second,
 	}
+}
 
-	resp, err := client.Do(req)
+// doHTTPRequest executes the http request.
+func doHTTPRequest(req *http.Request) (*http.Response, error) {
+	resp, err := Client.Do(req)
 	if (err == nil) && (resp.StatusCode != http.StatusOK) {
-		err = fmt.Errorf("Response status = %v", resp.Status)
+		err = fmt.Errorf("Get %q with response status = %v", req.URL, resp.Status)
 	}
-
 	return resp, err
 }
-
-/*
-// doHTTPRequest executes the http request.
-// It cancels the request in case the `ctx` is cancelled.
-func doHTTPRequestOLD(ctx context.Context, req *http.Request) (*http.Response, error) {
-
-	type result struct {
-		resp *http.Response
-		err  error
-	}
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	default:
-		// make the request
-		tr := &http.Transport{}
-		client := &http.Client{
-			Transport: tr,
-			Timeout:   10 * time.Second,
-		}
-
-		c := make(chan result, 1)
-
-		go func() {
-			resp, err := client.Do(req)
-			c <- result{resp: resp, err: err}
-		}()
-
-		// wait for the result or the cancel signal
-		select {
-		case <-ctx.Done():
-			tr.CancelRequest(req)
-			<-c // Wait for client.Do
-			return nil, ctx.Err()
-		case r := <-c:
-
-			if (r.err == nil) && (r.resp.StatusCode != http.StatusOK) {
-				r.err = fmt.Errorf("Response status = %v", r.resp.Status)
-			}
-
-			return r.resp, r.err
-		}
-	}
-}
-*/

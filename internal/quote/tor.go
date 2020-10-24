@@ -2,11 +2,19 @@ package quote
 
 import (
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/mmbros/quote/internal/htmlquotescraper"
 )
+
+// InitClient ...
+func InitClient(proxy string) {
+	if proxy == "" {
+		return
+	}
+	htmlquotescraper.Client = htmlquotescraper.DefaultClient(proxy)
+}
 
 // TorCheck checks if a Tor connection is used,
 // retrieving the "https://check.torproject.org" page.
@@ -19,7 +27,7 @@ func TorCheck() (bool, string, error) {
 	var webURL string = "https://check.torproject.org"
 
 	// Make request
-	resp, err := http.Get(webURL)
+	resp, err := htmlquotescraper.Client.Get(webURL)
 	if err != nil {
 		return false, "", err
 	}
