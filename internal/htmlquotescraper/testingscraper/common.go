@@ -1,8 +1,10 @@
 package testingscraper
 
 import (
+	"archive/zip"
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -95,24 +97,65 @@ func NewDocumentFromFile(path string) (*goquery.Document, error) {
 	return goquery.NewDocumentFromReader(f)
 }
 
-// GetFullPath returns the full path to the file "test/internal/quotescaper/<relpath>".
-func GetFullPath(relpath string) string {
-	const (
-		root   = "quote"
-		prefix = "/test/internal/quotescraper"
-	)
+// NewDocumentFromZipFile returns the goquery.Document created by a zipped html file
+func NewDocumentFromZipFile(file *zip.File) (*goquery.Document, error) {
+	fc, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer fc.Close()
 
+	return goquery.NewDocumentFromReader(fc)
+}
+
+func getBaseDir() string {
 	currentWorkingDirectory, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
-	fin := strings.SplitAfter(currentWorkingDirectory, root)[0]
-	return filepath.Join(fin, prefix, relpath)
+	base := strings.SplitAfter(currentWorkingDirectory, "quote")[0]
+	return base
+}
+
+// getFullPath returns the full path to the file "test/internal/quotescaper/<relpath>".
+func getFullPath(relpath string) string {
+	base := getBaseDir()
+	return filepath.Join(base, "/test/internal/quotescraper", relpath)
 }
 
 // GetDoc returns the goquery.Document created by
 // the local html file "test/internal/quotescaper/<relpath>".
 func GetDoc(relpath string) (*goquery.Document, error) {
-	fullpath := GetFullPath(relpath)
-	return NewDocumentFromFile(fullpath)
+	// use file system first
+	fullpath := getFullPath(relpath)
+	doc, err := NewDocumentFromFile(fullpath)
+	if err == nil {
+		return doc, nil
+	}
+
+	// then use zip file
+	return zipGetDoc(relpath)
+}
+
+func zipGetDoc(relpath string) (*goquery.Document, error) {
+	// retrieve zip file full path
+	zipfile := filepath.Join(getBaseDir(), "/test/internal/quotescraper.zip")
+
+	// open zip file
+	r, err := zip.OpenReader(zipfile)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+
+	fname := filepath.Join("quotescraper", relpath)
+
+	// Iterate through the files in the archive,
+	for _, f := range r.File {
+		if f.Name == fname {
+			return NewDocumentFromZipFile(f)
+		}
+	}
+
+	return nil, fmt.Errorf("File %q not found in %q", relpath, zipfile)
 }
