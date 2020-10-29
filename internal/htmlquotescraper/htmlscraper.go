@@ -104,7 +104,7 @@ func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr HTMLQuoteSc
 		URL:      url,
 		Price:    vPrice,
 		Date:     vDate,
-		Currency: pir.CurrencyStr,
+		Currency: quotegetter.NormalizeCurrency(pir.CurrencyStr),
 	}
 	return r, nil
 }

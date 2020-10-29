@@ -2,6 +2,7 @@ package quotegetter
 
 import (
 	"context"
+	"strings"
 	"time"
 )
 
@@ -19,4 +20,13 @@ type Result struct {
 	Price    float32
 	Currency string
 	Date     time.Time
+}
+
+// NormalizeCurrency return the standard ISO4217 representation
+// of the known currency
+func NormalizeCurrency(currency string) string {
+	if strings.EqualFold(currency, "euro") {
+		return "EUR"
+	}
+	return currency
 }
