@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"sort"
 	"time"
 
@@ -79,141 +78,78 @@ func (t *taskGetQuote) TaskID() taskengine.TaskID {
 }
 
 type resultGetQuote struct {
-	*quotegetter.Result
-	ScraperInst int       `json:"instance"`
-	TimeStart   time.Time `json:"time_start"`
-	TimeEnd     time.Time `json:"time_end"`
-	Err         error     `json:"-"`
-	ErrMsg      string    `json:"error"`
+	Isin      string    `json:"isin,omitempty"`
+	Source    string    `json:"source,omitempty"`
+	Instance  int       `json:"instance"`
+	URL       string    `json:"url,omitempty"`
+	Price     float32   `json:"price,omitempty"`
+	Currency  string    `json:"currency,omitempty"`
+	Date      time.Time `json:"date,omitempty"`
+	TimeStart time.Time `json:"time_start"`
+	TimeEnd   time.Time `json:"time_end"`
+	ErrMsg    string    `json:"error,omitempty"`
+	Err       error     `json:"-"`
 }
 
 func (r *resultGetQuote) Success() bool {
 	return r.Err == nil
 }
 
-// // GetOld is ..
-// func GetOld(isins []string, sources []string, workers int) error {
+func (r *resultGetQuote) dbInsert(db *quotegetterdb.QuoteDatabase) error {
+	var qr *quotegetterdb.QuoteRecord
 
-// 	// array of the used sources
-// 	filteredSources, err := getFilteredSources(sources)
-// 	if err != nil {
-// 		return err
-// 	}
+	// assert := func(b bool, label string) {
+	// 	if !b {
+	// 		panic("failed assert: " + label)
+	// 	}
+	// }
 
-// 	// Tasks
-// 	ts := make(taskengine.Tasks, 0, len(isins))
-// 	for _, isin := range isins {
-// 		ts = append(ts, &taskGetQuote{isin, ""})
-// 	}
+	// assert(r != nil, "r != nil")
+	// assert(db != nil, "db != nil")
 
-// 	// Workers
-// 	ws := make([]*taskengine.Worker, 0, len(filteredSources))
+	// skip context.Canceled errors
+	if r.Err != nil {
+		if err, ok := r.Err.(*htmlquotescraper.Error); ok {
+			if !errors.Is(err, context.Canceled) {
+				return nil
+			}
+		}
+	}
+	qr = &quotegetterdb.QuoteRecord{
+		Isin:     r.Isin,
+		Source:   r.Source,
+		Price:    r.Price,
+		Currency: r.Currency,
+		Date:     r.Date,
+		URL:      r.URL,
+		ErrMsg:   r.ErrMsg,
+	}
+	// isin and source are mandatory
+	// assert(len(qr.Isin) > 0, "len(qr.Isin) > 0")
+	// assert(len(qr.Source) > 0, "len(qr.Source) > 0")
 
-// 	// WorkerTasks
-// 	wts := make(taskengine.WorkerTasks)
+	// save to database
+	return db.InsertQuotes(qr)
+}
 
-// 	for _, name := range filteredSources {
-
-// 		qg := quoteGetter[name]
-
-// 		// work function for the named source
-// 		wfn := func(ctx context.Context, inst int, task taskengine.Task) taskengine.Result {
-// 			t := task.(*taskGetQuote)
-// 			time1 := time.Now()
-// 			res, err := qg.GetQuote(ctx, t.isin, t.url)
-// 			time2 := time.Now()
-
-// 			r := &resultGetQuote{
-// 				Result:      res,
-// 				ScraperInst: inst,
-// 				TimeStart:   time1,
-// 				TimeEnd:     time2,
-// 				Err:         err,
-// 			}
-// 			return r
-// 		}
-
-// 		w := &taskengine.Worker{
-// 			WorkerID:  taskengine.WorkerID(name),
-// 			Instances: workers,
-// 			Work:      wfn,
-// 		}
-// 		ws = append(ws, w)
-
-// 		// set the same tasks for all the workers
-// 		wts[w.WorkerID] = ts
-// 	}
-
-// 	wts.SortTasks()
-
-// 	resChan, err := taskengine.Execute(context.Background(), ws, wts)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	results := []*resultGetQuote{}
-// 	for r := range resChan {
-// 		res := r.(*resultGetQuote)
-// 		results = append(results, res)
-// 	}
-
-// 	json, err := json.MarshalIndent(results, "", " ")
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	fmt.Println(string(json))
-
-// 	return nil
-// }
-
-func dbInsert(dbpath string, results []*resultGetQuote) {
+func dbInsert(dbpath string, results []*resultGetQuote) error {
 	if len(dbpath) == 0 {
-		return
+		return nil
 	}
 
 	// save to database
 	db, err := quotegetterdb.Open(dbpath)
 	if db != nil {
 		defer db.Close()
-		qrs := make([]*quotegetterdb.QuoteRecord, 0, len(results))
 
 		for _, r := range results {
-			var qr *quotegetterdb.QuoteRecord
-
-			if r.Err != nil {
-				if e, ok := r.Err.(*htmlquotescraper.Error); ok {
-					// skip context.Canceled errors
-					if !errors.Is(e, context.Canceled) {
-						qr = &quotegetterdb.QuoteRecord{
-							Isin:   e.Isin,
-							Source: e.Name,
-							URL:    e.URL,
-							ErrMsg: r.ErrMsg,
-						}
-					}
-				}
-			}
-			if r.Result != nil {
-				qr = &quotegetterdb.QuoteRecord{
-					Isin:     r.Isin,
-					Source:   r.Name,
-					Price:    r.Price,
-					Currency: r.Currency,
-					Date:     r.Date,
-					URL:      r.URL,
-					ErrMsg:   r.ErrMsg,
-				}
-			}
-			if (qr != nil) && (len(qr.Isin) > 0) && (len(qr.Source) > 0) {
-				qrs = append(qrs, qr)
+			err = r.dbInsert(db)
+			if err != nil {
+				return err
 			}
 		}
-		err = db.InsertQuotes(qrs...)
 	}
-	if err != nil {
-		log.Print(err)
-	}
+	return nil
 }
 
 // Get is ..
@@ -260,15 +196,27 @@ func Get(isins []string, sources []string, workers []int, dbpath string) error {
 			time2 := time.Now()
 
 			r := &resultGetQuote{
-				Result:      res,
-				ScraperInst: inst,
-				TimeStart:   time1,
-				TimeEnd:     time2,
-				Err:         err,
+				Instance:  inst,
+				TimeStart: time1,
+				TimeEnd:   time2,
+				Err:       err,
+			}
+			if res != nil {
+				r.Isin = res.Isin
+				r.Source = res.Name
+				r.Date = res.Date
+				r.Price = res.Price
+				r.Currency = res.Currency
 			}
 			if err != nil {
 				r.ErrMsg = err.Error()
+				if e, ok := err.(*htmlquotescraper.Error); ok {
+					r.Isin = e.Isin
+					r.Source = e.Name
+					r.URL = e.URL
+				}
 			}
+
 			return r
 		}
 
@@ -297,7 +245,10 @@ func Get(isins []string, sources []string, workers []int, dbpath string) error {
 	}
 
 	// save to database, if not empty
-	dbInsert(dbpath, results)
+	err = dbInsert(dbpath, results)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	json, err := json.MarshalIndent(results, "", " ")
 	if err != nil {
