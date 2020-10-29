@@ -77,18 +77,21 @@ func (t *taskGetQuote) TaskID() taskengine.TaskID {
 	return taskengine.TaskID(t.isin)
 }
 
+// resultGetQuote.Date field is a pointer in order to omit zero dates.
+// see https://stackoverflow.com/questions/32643815/json-omitempty-with-time-time-field
+
 type resultGetQuote struct {
-	Isin      string    `json:"isin,omitempty"`
-	Source    string    `json:"source,omitempty"`
-	Instance  int       `json:"instance"`
-	URL       string    `json:"url,omitempty"`
-	Price     float32   `json:"price,omitempty"`
-	Currency  string    `json:"currency,omitempty"`
-	Date      time.Time `json:"date,omitempty"`
-	TimeStart time.Time `json:"time_start"`
-	TimeEnd   time.Time `json:"time_end"`
-	ErrMsg    string    `json:"error,omitempty"`
-	Err       error     `json:"-"`
+	Isin      string     `json:"isin,omitempty"`
+	Source    string     `json:"source,omitempty"`
+	Instance  int        `json:"instance"`
+	URL       string     `json:"url,omitempty"`
+	Price     float32    `json:"price,omitempty"`
+	Currency  string     `json:"currency,omitempty"`
+	Date      *time.Time `json:"date,omitempty"` // need a pointer to omit zero date
+	TimeStart time.Time  `json:"time_start"`
+	TimeEnd   time.Time  `json:"time_end"`
+	ErrMsg    string     `json:"error,omitempty"`
+	Err       error      `json:"-"`
 }
 
 func (r *resultGetQuote) Success() bool {
@@ -120,9 +123,11 @@ func (r *resultGetQuote) dbInsert(db *quotegetterdb.QuoteDatabase) error {
 		Source:   r.Source,
 		Price:    r.Price,
 		Currency: r.Currency,
-		Date:     r.Date,
 		URL:      r.URL,
 		ErrMsg:   r.ErrMsg,
+	}
+	if r.Date != nil {
+		qr.Date = *r.Date
 	}
 	// isin and source are mandatory
 	// assert(len(qr.Isin) > 0, "len(qr.Isin) > 0")
@@ -204,9 +209,11 @@ func Get(isins []string, sources []string, workers []int, dbpath string) error {
 			if res != nil {
 				r.Isin = res.Isin
 				r.Source = res.Name
-				r.Date = res.Date
 				r.Price = res.Price
 				r.Currency = res.Currency
+				if !res.Date.IsZero() {
+					r.Date = &res.Date
+				}
 			}
 			if err != nil {
 				r.ErrMsg = err.Error()
