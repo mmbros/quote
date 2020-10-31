@@ -1,4 +1,4 @@
-package htmlquotescraper
+package scrapers
 
 import (
 	"errors"

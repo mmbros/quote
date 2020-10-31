@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/mmbros/quote/internal/htmlquotescraper"
+	"github.com/mmbros/quote/internal/quotegetter"
 )
 
 // InitClient ...
@@ -13,7 +13,7 @@ func InitClient(proxy string) {
 	if proxy == "" {
 		return
 	}
-	htmlquotescraper.Client = htmlquotescraper.DefaultClient(proxy)
+	quotegetter.Client = quotegetter.DefaultClient(proxy)
 }
 
 // TorCheck checks if a Tor connection is used,
@@ -27,7 +27,7 @@ func TorCheck() (bool, string, error) {
 	var webURL string = "https://check.torproject.org"
 
 	// Make request
-	resp, err := htmlquotescraper.Client.Get(webURL)
+	resp, err := quotegetter.Client.Get(webURL)
 	if err != nil {
 		return false, "", err
 	}

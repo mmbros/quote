@@ -1,4 +1,4 @@
-package htmlquotescraper
+package quotegetter
 
 import (
 	"fmt"
@@ -34,8 +34,8 @@ func DefaultClient(proxy string) *http.Client {
 	}
 }
 
-// doHTTPRequest executes the http request.
-func doHTTPRequest(req *http.Request) (*http.Response, error) {
+// DoHTTPRequest executes the http request.
+func DoHTTPRequest(req *http.Request) (*http.Response, error) {
 	resp, err := Client.Do(req)
 	if (err == nil) && (resp.StatusCode != http.StatusOK) {
 		err = fmt.Errorf("Get %q with response status = %v", req.URL, resp.Status)

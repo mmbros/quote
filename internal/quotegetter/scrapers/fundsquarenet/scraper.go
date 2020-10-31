@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/mmbros/quote/internal/htmlquotescraper"
 	"github.com/mmbros/quote/internal/quotegetter"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers"
 )
 
 // scraper gets stock/fund prices from www.fundsquare.net
@@ -16,19 +16,19 @@ type scraper string
 
 // func init() {
 // 	const name = "fundsquarenet"
-// 	htmlquotescraper.Register(newScraper(name))
+// 	scrapers.Register(newScraper(name))
 // }
 
-// NewScraper creates a new htmlquotescraper
+// NewScraper creates a new scrapers
 // that gets stock/fund prices from www.fundsquare.net
-// func NewScraper(name string) htmlquotescraper.HTMLQuoteScraper {
+// func NewScraper(name string) scrapers.HTMLQuoteScraper {
 // 	return scraper(name)
 // }
 
 // NewQuoteGetter creates a new QuoteGetter
 // that gets stock/fund prices from www.fundsquare.net
 func NewQuoteGetter(name string) quotegetter.QuoteGetter {
-	return htmlquotescraper.NewQuoteGetter(scraper(name))
+	return scrapers.NewQuoteGetter(scraper(name))
 }
 
 // Name returns the name of the scraper
@@ -80,7 +80,7 @@ func (p scraper) GetInfo(ctx context.Context, isin, url string) (*http.Request, 
 }
 
 // ParseInfo is ...
-func (p scraper) ParseInfo(doc *goquery.Document) (*htmlquotescraper.ParseInfoResult, error) {
+func (p scraper) ParseInfo(doc *goquery.Document, isin string) (*scrapers.ParseInfoResult, error) {
 	// SCENARIO OK
 	// -----------
 	// <div id="content">
@@ -146,7 +146,7 @@ func (p scraper) ParseInfo(doc *goquery.Document) (*htmlquotescraper.ParseInfoRe
 	// 					<div class="contenu"><p class="zero"></p><p><span class="surligneorange"> No result</span> produced by your request.</p><p>Please<span class="surligneorange"> modify your search criteria</span>.</p><input type="submit" id="valida" name="valider" onclick="window.location=&#39;/search?fastSearch=O&amp;isISIN=O&amp;search=IT0005247157&#39;" class="back_search_w btn_w" value="Back to search"/><br class="clear_r"/><p></p></div><p class="ps">Number of results : <span>0</span></p>
 	// 				</span>
 
-	r := new(htmlquotescraper.ParseInfoResult)
+	r := new(scrapers.ParseInfoResult)
 	r.DateLayout = "02/01/2006"
 	var txtPriceCurrency string
 
@@ -179,13 +179,13 @@ func (p scraper) ParseInfo(doc *goquery.Document) (*htmlquotescraper.ParseInfoRe
 		// check for "No result produced by your request.""
 		s := strings.TrimSpace(doc.Find("div.contenu span.surligneorange").Text())
 		if strings.HasPrefix(s, "No result") {
-			return r, htmlquotescraper.ErrNoResultFound
+			return r, scrapers.ErrNoResultFound
 		}
 	}
 
 	// split price and currency (11.49 EUR)
 	var errPrice error
-	r.PriceStr, r.CurrencyStr, errPrice = htmlquotescraper.SplitPriceCurrency(txtPriceCurrency, true)
+	r.PriceStr, r.CurrencyStr, errPrice = scrapers.SplitPriceCurrency(txtPriceCurrency, true)
 
 	return r, errPrice
 }

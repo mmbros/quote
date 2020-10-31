@@ -1,4 +1,4 @@
-package htmlquotescraper
+package quotegetter
 
 import (
 	"context"
@@ -12,8 +12,9 @@ import (
 	"time"
 )
 
-// NewTestServer create a new httptest server that returns a response build on the request parameters.
-// special parameters:
+// NewTestServer create a new httptest server that returns a response
+// build on the request parameters.
+// Special parameters:
 //   delay: number of msec to sleep before returning the response
 //   code: returned http status
 func NewTestServer() *httptest.Server {
@@ -90,7 +91,7 @@ func TestDoHTTPRequestWithTimeout(t *testing.T) {
 	}
 
 	// do
-	_, err = doHTTPRequest(req)
+	_, err = DoHTTPRequest(req)
 
 	// check
 	if err == nil {
@@ -140,7 +141,7 @@ func TestDoHTTPRequestWithCancel(t *testing.T) {
 	}
 
 	// do
-	_, err = doHTTPRequest(req)
+	_, err = DoHTTPRequest(req)
 
 	// check
 	if err == nil {
@@ -182,7 +183,7 @@ func TestDoHTTPRequestOK(t *testing.T) {
 	}
 
 	// do
-	resp, err := doHTTPRequest(req)
+	resp, err := DoHTTPRequest(req)
 
 	// check
 	if err != nil {
@@ -219,7 +220,7 @@ func TestDoHTTPRequestKO(t *testing.T) {
 	}
 
 	// do
-	_, err = doHTTPRequest(req)
+	_, err = DoHTTPRequest(req)
 
 	// check
 	if err == nil {

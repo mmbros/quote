@@ -4,11 +4,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/mmbros/quote/internal/htmlquotescraper"
-	"github.com/mmbros/quote/internal/htmlquotescraper/testingscraper"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers/testingscraper"
 )
 
-func getTestScraper() htmlquotescraper.HTMLQuoteScraper {
+func getTestScraper() scrapers.HTMLQuoteScraper {
 	return scraper("fundsquarenet")
 }
 
@@ -70,13 +70,13 @@ func TestParseInfo(t *testing.T) {
 			t.Error(tc.filename, err)
 			continue
 		}
-		res, err := scr.ParseInfo(doc)
+		res, err := scr.ParseInfo(doc, "")
 		if err != nil {
 			if tc.priceStr != "" {
 				t.Errorf("[%s] Unexpected error %q", tc.filename, err)
 			}
-			if err != htmlquotescraper.ErrNoResultFound {
-				t.Errorf("[%s] Unexpected error %q, expected %q", tc.filename, err, htmlquotescraper.ErrNoResultFound)
+			if err != scrapers.ErrNoResultFound {
+				t.Errorf("[%s] Unexpected error %q, expected %q", tc.filename, err, scrapers.ErrNoResultFound)
 			}
 
 			continue

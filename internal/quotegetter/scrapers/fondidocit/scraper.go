@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/mmbros/quote/internal/htmlquotescraper"
 	"github.com/mmbros/quote/internal/quotegetter"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers"
 )
 
 // scraper gets stock/fund prices from fondidoc.it
@@ -16,19 +16,19 @@ type scraper string
 
 // func init() {
 // 	const name = "fondidocit"
-// 	htmlquotescraper.Register(newScraper(name))
+// 	scrapers.Register(newScraper(name))
 // }
 
-// newScraper creates a new htmlquotescraper
+// newScraper creates a new scrapers
 // that gets stock/fund prices from fondidoc.it
-// func newScraper(name string) htmlquotescraper.HTMLQuoteScraper {
+// func newScraper(name string) scrapers.HTMLQuoteScraper {
 // 	return scraper(name)
 // }
 
 // NewQuoteGetter creates a new QuoteGetter
 // that gets stock/fund prices from fondidoc.it
 func NewQuoteGetter(name string) quotegetter.QuoteGetter {
-	return htmlquotescraper.NewQuoteGetter(scraper(name))
+	return scrapers.NewQuoteGetter(scraper(name))
 }
 
 // Name returns the name of the scraper
@@ -90,7 +90,7 @@ func (p scraper) ParseSearch(doc *goquery.Document, isin string) (string, error)
 	})
 
 	if !found {
-		return "", htmlquotescraper.ErrNoResultFound
+		return "", scrapers.ErrNoResultFound
 	}
 
 	return url, nil
@@ -104,7 +104,7 @@ func (p scraper) GetInfo(ctx context.Context, isin, url string) (*http.Request, 
 }
 
 // ParseInfo is ...
-func (p scraper) ParseInfo(doc *goquery.Document) (*htmlquotescraper.ParseInfoResult, error) {
+func (p scraper) ParseInfo(doc *goquery.Document, isin string) (*scrapers.ParseInfoResult, error) {
 	/*
 		<div class="page-header">
 		    <a href="/Confronto/Index/PIMDIEHI" style="float:right;margin-top:10px;" class="btn btn-default btn-sm btn-primary" ><i class="glyphicon glyphicon-plus"></i> Confronta</a>
@@ -119,7 +119,7 @@ func (p scraper) ParseInfo(doc *goquery.Document) (*htmlquotescraper.ParseInfoRe
 		[4] -0,18%
 	*/
 
-	r := new(htmlquotescraper.ParseInfoResult)
+	r := new(scrapers.ParseInfoResult)
 	r.DateLayout = "02/01/2006"
 
 	r.IsinStr = doc.Find("div.page-header small").Text()
@@ -138,7 +138,7 @@ func (p scraper) ParseInfo(doc *goquery.Document) (*htmlquotescraper.ParseInfoRe
 	})
 
 	if r.DateStr == "" && r.PriceStr == "" {
-		return r, htmlquotescraper.ErrNoResultFound
+		return r, scrapers.ErrNoResultFound
 	}
 	return r, nil
 }

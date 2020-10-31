@@ -8,11 +8,12 @@ import (
 	"sort"
 	"time"
 
-	"github.com/mmbros/quote/internal/htmlquotescraper"
-	"github.com/mmbros/quote/internal/htmlquotescraper/fondidocit"
-	"github.com/mmbros/quote/internal/htmlquotescraper/fundsquarenet"
-	"github.com/mmbros/quote/internal/htmlquotescraper/morningstarit"
 	"github.com/mmbros/quote/internal/quotegetter"
+	"github.com/mmbros/quote/internal/quotegetter/cryptonatorcom"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers/fondidocit"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers/fundsquarenet"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers/morningstarit"
 	"github.com/mmbros/quote/internal/quotegetterdb"
 	"github.com/mmbros/quote/pkg/taskengine"
 )
@@ -24,14 +25,20 @@ var (
 func init() {
 	type fnNewQuoteGetter func(string) quotegetter.QuoteGetter
 
+	fnCryptonatorcomEUR := func(name string) quotegetter.QuoteGetter {
+		return cryptonatorcom.NewQuoteGetter(name, "EUR")
+	}
+
 	src := map[string]fnNewQuoteGetter{
-		"fondidocit":    fondidocit.NewQuoteGetter,
-		"morningstarit": morningstarit.NewQuoteGetter,
-		"fundsquarenet": fundsquarenet.NewQuoteGetter,
+		"fondidocit":     fondidocit.NewQuoteGetter,
+		"morningstarit":  morningstarit.NewQuoteGetter,
+		"fundsquarenet":  fundsquarenet.NewQuoteGetter,
+		"cryptonatorcom": fnCryptonatorcomEUR,
 	}
 
 	for name, fn := range src {
-		quoteGetter[name] = fn(name)
+		qg := fn(name)
+		quoteGetter[qg.Name()] = qg
 	}
 
 }
@@ -112,7 +119,7 @@ func (r *resultGetQuote) dbInsert(db *quotegetterdb.QuoteDatabase) error {
 
 	// skip context.Canceled errors
 	if r.Err != nil {
-		if err, ok := r.Err.(*htmlquotescraper.Error); ok {
+		if err, ok := r.Err.(*scrapers.Error); ok {
 			if !errors.Is(err, context.Canceled) {
 				return nil
 			}
@@ -217,7 +224,7 @@ func Get(isins []string, sources []string, workers []int, dbpath string) error {
 			}
 			if err != nil {
 				r.ErrMsg = err.Error()
-				if e, ok := err.(*htmlquotescraper.Error); ok {
+				if e, ok := err.(*scrapers.Error); ok {
 					r.Isin = e.Isin
 					r.Source = e.Name
 					r.URL = e.URL

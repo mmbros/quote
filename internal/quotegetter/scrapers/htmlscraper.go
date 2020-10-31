@@ -1,4 +1,4 @@
-package htmlquotescraper
+package scrapers
 
 import (
 	"context"
@@ -13,13 +13,13 @@ import (
 	"github.com/mmbros/quote/internal/quotegetter"
 )
 
-// HTMLQuoteScraper interface
-type HTMLQuoteScraper interface {
+// scrapers interface
+type scrapers interface {
 	Name() string
 	GetSearch(ctx context.Context, isin string) (*http.Request, error)
 	ParseSearch(doc *goquery.Document, isin string) (string, error)
 	GetInfo(ctx context.Context, isin, url string) (*http.Request, error)
-	ParseInfo(doc *goquery.Document) (*ParseInfoResult, error)
+	ParseInfo(doc *goquery.Document, isin string) (*ParseInfoResult, error)
 }
 
 // ParseInfoResult is ...
@@ -33,16 +33,16 @@ type ParseInfoResult struct {
 
 // quoteGetter is ...
 type quoteGetter struct {
-	HTMLQuoteScraper
+	scrapers
 }
 
 // NewQuoteGetter is ..
-func NewQuoteGetter(scr HTMLQuoteScraper) quotegetter.QuoteGetter {
+func NewQuoteGetter(scr scrapers) quotegetter.QuoteGetter {
 	return &quoteGetter{scr}
 }
 
-// // Register register a new HTMLQuoteScraper
-// func Register(scr HTMLQuoteScraper) {
+// // Register register a new scrapers
+// func Register(scr scrapers) {
 // 	quotegetter.Register(newQuoteGetter(scr))
 // }
 
@@ -52,7 +52,7 @@ func (qg *quoteGetter) GetQuote(ctx context.Context, isin, url string) (*quotege
 }
 
 // getInfoFromDoc parse the info page and returns the result
-func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr HTMLQuoteScraper) (*quotegetter.Result, error) {
+func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr scrapers) (*quotegetter.Result, error) {
 	var (
 		pir *ParseInfoResult
 		err error
@@ -72,7 +72,7 @@ func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr HTMLQuoteSc
 	}
 
 	// parse the info document to get the results
-	pir, err = scr.ParseInfo(docInfo)
+	pir, err = scr.ParseInfo(docInfo, isin)
 	if err != nil {
 		errType := ParseInfoError
 		if err == ErrNoResultFound {
@@ -109,7 +109,7 @@ func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr HTMLQuoteSc
 	return r, nil
 }
 
-func getQuote(ctx context.Context, isin, url string, scr HTMLQuoteScraper) (*quotegetter.Result, error) {
+func getQuote(ctx context.Context, isin, url string, scr scrapers) (*quotegetter.Result, error) {
 
 	var (
 		req  *http.Request
@@ -139,7 +139,7 @@ func getQuote(ctx context.Context, isin, url string, scr HTMLQuoteScraper) (*quo
 
 		// reqSearch can be nil if the Info URL can be build from isin only
 		if req != nil && err == nil {
-			resp, err = doHTTPRequest(req)
+			resp, err = quotegetter.DoHTTPRequest(req)
 		}
 		if err != nil {
 			return theError(err, GetSearchError)
@@ -196,7 +196,7 @@ func getQuote(ctx context.Context, isin, url string, scr HTMLQuoteScraper) (*quo
 		if req == nil {
 			return theError(ErrInfoRequestIsNil, GetInfoError)
 		}
-		resp, err = doHTTPRequest(req)
+		resp, err = quotegetter.DoHTTPRequest(req)
 	}
 	if err != nil {
 		return theError(err, GetInfoError)

@@ -3,11 +3,11 @@ package morningstarit
 import (
 	"testing"
 
-	"github.com/mmbros/quote/internal/htmlquotescraper"
-	"github.com/mmbros/quote/internal/htmlquotescraper/testingscraper"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers/testingscraper"
 )
 
-func getTestScraper() htmlquotescraper.HTMLQuoteScraper {
+func getTestScraper() scrapers.HTMLQuoteScraper {
 	return scraper("morningstarit")
 }
 
@@ -32,7 +32,7 @@ func TestParseSearch(t *testing.T) {
 		err      error
 	}{
 		{"IE00B4TG9K96", "morningstar.it/search|IE00B4TG9K96|ok.html", "/it/funds/snapshot/snapshot.aspx?id=F000005GUM", nil},
-		{"IE00B4TG9KAA", "morningstar.it/search|IE00B4TG9KAA|ko.html", "", htmlquotescraper.ErrNoResultFound},
+		{"IE00B4TG9KAA", "morningstar.it/search|IE00B4TG9KAA|ko.html", "", scrapers.ErrNoResultFound},
 	}
 
 	scr := getTestScraper()
@@ -80,13 +80,13 @@ func TestParseInfo(t *testing.T) {
 			continue
 		}
 
-		res, err := scr.ParseInfo(doc)
+		res, err := scr.ParseInfo(doc, "")
 		if err != nil {
 			if tc.priceStr != "" {
 				t.Errorf("[%s] Unexpected error %q", tc.filename, err)
 			}
-			if err != htmlquotescraper.ErrNoResultFound {
-				t.Errorf("[%s] Unexpected error %q, expected %q", tc.filename, err, htmlquotescraper.ErrNoResultFound)
+			if err != scrapers.ErrNoResultFound {
+				t.Errorf("[%s] Unexpected error %q, expected %q", tc.filename, err, scrapers.ErrNoResultFound)
 			}
 
 			continue

@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/mmbros/quote/internal/htmlquotescraper"
-	"github.com/mmbros/quote/internal/htmlquotescraper/testingscraper"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers/testingscraper"
 )
 
-func getTestScraper() htmlquotescraper.HTMLQuoteScraper {
+func getTestScraper() scrapers.HTMLQuoteScraper {
 	return scraper("fondidocit")
 }
 
@@ -77,7 +77,7 @@ func TestParseSearch(t *testing.T) {
 		{"ko-isin",
 			"IE00B4TG9XYZ",
 			"",
-			htmlquotescraper.ErrNoResultFound,
+			scrapers.ErrNoResultFound,
 			`<table>
 <tr>
 <td>
@@ -101,7 +101,7 @@ func TestParseSearch(t *testing.T) {
 		{"ko-url",
 			"IE00B4TG9K96",
 			"",
-			htmlquotescraper.ErrNoResultFound,
+			scrapers.ErrNoResultFound,
 			`<table>
 <tr>
 <td>
@@ -126,7 +126,7 @@ func TestParseSearch(t *testing.T) {
 		{"ko-all",
 			"IE00B4TG9ABC",
 			"",
-			htmlquotescraper.ErrNoResultFound,
+			scrapers.ErrNoResultFound,
 			``,
 		},
 	}
@@ -220,7 +220,7 @@ func TestParseInfo(t *testing.T) {
 			title:    "ko-price-date",
 			priceStr: "",
 			dateStr:  "",
-			err:      htmlquotescraper.ErrNoResultFound,
+			err:      scrapers.ErrNoResultFound,
 			html: `<div class="page-header">
 		<a href="/Confronto/Index/PIMDIEHI" style="float:right;margin-top:10px;" class="btn btn-default btn-sm btn-primary" ><i class="glyphicon glyphicon-plus"></i> Confronta</a>
 		<h1>PIMCO Diversified Income E Dis EUR Hdg <small>IE00B4TG9K96</small></h1>
@@ -319,7 +319,7 @@ func TestParseInfo(t *testing.T) {
 			continue
 		}
 
-		res, err := scr.ParseInfo(doc)
+		res, err := scr.ParseInfo(doc, "")
 		if checkError(t, prefix, err, tc.err) {
 			continue
 		}

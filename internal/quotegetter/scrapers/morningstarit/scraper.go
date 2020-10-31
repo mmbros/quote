@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/mmbros/quote/internal/htmlquotescraper"
 	"github.com/mmbros/quote/internal/quotegetter"
+	"github.com/mmbros/quote/internal/quotegetter/scrapers"
 )
 
 // scraper gets stock/fund prices from www.morningstar.it
@@ -15,19 +15,19 @@ type scraper string
 
 // func init() {
 // 	const name = "morningstarit"
-// 	htmlquotescraper.Register(NewScraper(name))
+// 	scrapers.Register(NewScraper(name))
 // }
 
-// NewScraper creates a new htmlquotescraper
+// NewScraper creates a new scrapers
 // that gets stock/fund prices from www.morningstar.it
-// func NewScraper(name string) htmlquotescraper.HTMLQuoteScraper {
+// func NewScraper(name string) scrapers.HTMLQuoteScraper {
 // 	return scraper(name)
 // }
 
 // NewQuoteGetter creates a new QuoteGetter
 // that gets stock/fund prices from www.fundsquare.net
 func NewQuoteGetter(name string) quotegetter.QuoteGetter {
-	return htmlquotescraper.NewQuoteGetter(scraper(name))
+	return scrapers.NewQuoteGetter(scraper(name))
 }
 
 // Name returns the name of the scraper
@@ -72,7 +72,7 @@ func (scr scraper) ParseSearch(doc *goquery.Document, isin string) (string, erro
 	*/
 	url, ok := doc.Find("#ctl00_MainContent_fundTable td.searchLink > a").Attr("href")
 	if !ok {
-		return "", htmlquotescraper.ErrNoResultFound
+		return "", scrapers.ErrNoResultFound
 	}
 
 	return url, nil
@@ -86,7 +86,7 @@ func (scr scraper) GetInfo(ctx context.Context, isin, url string) (*http.Request
 }
 
 // ParseInfo is ...
-func (scr scraper) ParseInfo(doc *goquery.Document) (*htmlquotescraper.ParseInfoResult, error) {
+func (scr scraper) ParseInfo(doc *goquery.Document, isin string) (*scrapers.ParseInfoResult, error) {
 	/*
 		<table class="snapshotTextColor snapshotTextFontStyle snapshotTable overviewKeyStatsTable" border="0">
 		  <tbody>
@@ -115,7 +115,7 @@ func (scr scraper) ParseInfo(doc *goquery.Document) (*htmlquotescraper.ParseInfo
 			<tr><td class="line heading">Fund Size (Mil)<span class="heading"><br>26/06/2020</span></td><td class="line">&nbsp;</td><td class="line text">EUR&nbsp;17,32</td></tr><tr><td class="line heading">Share Class Size (Mil)<span class="heading"><br>26/06/2020</span></td><td class="line">&nbsp;</td><td class="line text">EUR&nbsp;5,06</td></tr><tr><td class="line heading">Entrata (max)</td><td class="line">&nbsp;</td><td class="line text">-</td></tr><tr><td class="line heading"><a href="http://www.morningstar.it/it/glossary/121049/spese-correnti-ongoing-charge.aspx" style="text-decoration:underline;">Spese
 	*/
 
-	r := new(htmlquotescraper.ParseInfoResult)
+	r := new(scrapers.ParseInfoResult)
 	r.DateLayout = "02/01/2006"
 	var txtPriceCurrency string
 
@@ -134,7 +134,7 @@ func (scr scraper) ParseInfo(doc *goquery.Document) (*htmlquotescraper.ParseInfo
 
 	// split price and currency (EUR 126,370)
 	var errPrice error
-	r.PriceStr, r.CurrencyStr, errPrice = htmlquotescraper.SplitPriceCurrency(txtPriceCurrency, false)
+	r.PriceStr, r.CurrencyStr, errPrice = scrapers.SplitPriceCurrency(txtPriceCurrency, false)
 
 	return r, errPrice
 }
