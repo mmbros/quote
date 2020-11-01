@@ -37,7 +37,7 @@
 				"mode": "auto",
 				"program": "${workspaceFolder}/main.go",
 				"env": {"HTTPS_PROXY": "socks5://127.0.0.1:9050"},
-				"args": ["get", "ISIN00000001","--config", ".quote.yaml",  
+				"args": ["get", "ISIN00000001",  
 					"--tor", "--dry-run", "-s", "cippa:2, lippa, pluto/10"]
 			},		
 			{

@@ -49,15 +49,25 @@ See 'quote sources' for a list of the available sources.
 
 		// handle --dry-run flag
 		if vip.GetBool(nameDruRun) {
-			fmt.Printf(`quote get:
-  isins:          %v
-  sources:        %v
-  workers:        %v
+			fmt.Printf(`
+quote get:
+          config: %s
+           isins: %v
+         sources: %v
+         workers: %v
   defaultWorkers: %d
-  tor:            %v
-  proxy:          %s
-  database:       %s
-`, isins, sources, workers, defaultWorkers, torIsMandatory, proxy, database)
+             tor: %v
+           proxy: %s
+        database: %s
+`,
+				viper.ConfigFileUsed(),
+				isins,
+				sources,
+				workers,
+				defaultWorkers,
+				torIsMandatory,
+				proxy,
+				database)
 
 			return nil
 		}
