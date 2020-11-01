@@ -10,7 +10,7 @@ import (
 	"github.com/mmbros/quote/internal/quotegetter/scrapers/testingscraper"
 )
 
-func getTestScraper() scrapers.HTMLQuoteScraper {
+func getTestScraper() scrapers.Scraper {
 	return scraper("fondidocit")
 }
 

@@ -13,8 +13,8 @@ import (
 	"github.com/mmbros/quote/internal/quotegetter"
 )
 
-// scrapers interface
-type scrapers interface {
+// Scraper interface
+type Scraper interface {
 	Name() string
 	GetSearch(ctx context.Context, isin string) (*http.Request, error)
 	ParseSearch(doc *goquery.Document, isin string) (string, error)
@@ -33,11 +33,11 @@ type ParseInfoResult struct {
 
 // quoteGetter is ...
 type quoteGetter struct {
-	scrapers
+	Scraper
 }
 
 // NewQuoteGetter is ..
-func NewQuoteGetter(scr scrapers) quotegetter.QuoteGetter {
+func NewQuoteGetter(scr Scraper) quotegetter.QuoteGetter {
 	return &quoteGetter{scr}
 }
 
@@ -52,7 +52,7 @@ func (qg *quoteGetter) GetQuote(ctx context.Context, isin, url string) (*quotege
 }
 
 // getInfoFromDoc parse the info page and returns the result
-func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr scrapers) (*quotegetter.Result, error) {
+func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr Scraper) (*quotegetter.Result, error) {
 	var (
 		pir *ParseInfoResult
 		err error
@@ -109,7 +109,7 @@ func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr scrapers) (
 	return r, nil
 }
 
-func getQuote(ctx context.Context, isin, url string, scr scrapers) (*quotegetter.Result, error) {
+func getQuote(ctx context.Context, isin, url string, scr Scraper) (*quotegetter.Result, error) {
 
 	var (
 		req  *http.Request
