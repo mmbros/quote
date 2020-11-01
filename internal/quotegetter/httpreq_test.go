@@ -2,69 +2,22 @@ package quotegetter
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/mmbros/quote/internal/quotetesting"
 )
-
-// NewTestServer create a new httptest server that returns a response
-// build on the request parameters.
-// Special parameters:
-//   delay: number of msec to sleep before returning the response
-//   code: returned http status
-func NewTestServer() *httptest.Server {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
-		query := r.URL.Query()
-
-		// code
-		code, _ := strconv.Atoi(query.Get("code"))
-		if code == 0 {
-			code = http.StatusOK
-		}
-
-		// delay
-		delaymsec, _ := strconv.Atoi(query.Get("delay"))
-		if delaymsec > 0 {
-			time.Sleep(time.Duration(delaymsec) * time.Millisecond)
-		}
-
-		if code != http.StatusOK {
-			// set the status code
-			http.Error(w, http.StatusText(code), code)
-			return
-		}
-
-		fmt.Fprint(w, `<html>
-<head>
-<title>Test Server Result</title>
-</head>
-<body>
-<table>
-`)
-		for k, v := range query {
-			fmt.Fprintf(w, "<tr><th>%s</th><td>%s</td></tr>\n", k, v[0])
-		}
-		fmt.Fprint(w, `</table>
-</body>
-</html>`)
-
-	}))
-
-	return server
-}
 
 func TestDoHTTPRequestWithTimeout(t *testing.T) {
 	const (
 		timeout = 50
 		delay   = 100
 	)
-	server := NewTestServer()
+	server := quotetesting.NewTestServer()
 	defer server.Close()
 
 	// context
@@ -109,7 +62,7 @@ func TestDoHTTPRequestWithCancel(t *testing.T) {
 		timeout = 50
 		delay   = 100
 	)
-	server := NewTestServer()
+	server := quotetesting.NewTestServer()
 	defer server.Close()
 
 	// context
@@ -156,7 +109,7 @@ func TestDoHTTPRequestWithCancel(t *testing.T) {
 
 func TestDoHTTPRequestOK(t *testing.T) {
 
-	server := NewTestServer()
+	server := quotetesting.NewTestServer()
 	defer server.Close()
 
 	// context
@@ -200,7 +153,7 @@ func TestDoHTTPRequestOK(t *testing.T) {
 }
 
 func TestDoHTTPRequestKO(t *testing.T) {
-	server := NewTestServer()
+	server := quotetesting.NewTestServer()
 	defer server.Close()
 
 	// url
