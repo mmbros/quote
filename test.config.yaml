@@ -1,0 +1,38 @@
+# ------------------------
+# quote configuration file
+# ------------------------
+
+# optional database to save the results to
+# database: .quote.sqlite3
+
+# default number of workers for each source
+workers: 3
+
+# default proxy
+proxy: none
+
+proxies:
+  - proxy: tor
+    url: socks5://127.0.0.1:9050
+  - proxy: none
+
+sources: 
+  - source: crypto1-EUR
+    workers: 5
+    proxy: none
+  
+  - source: crypto1-USD
+    workers: 4
+
+  - source: crypto2-USD
+
+isins:
+  - isin: BTC
+    name: Bitcoin
+    sources: [crypto1-EUR]
+
+  - isin: ETH
+    name: Ethereum
+    sources: 
+      - crypto1-USD
+      - crypto2-USD
