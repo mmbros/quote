@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
 	"time"
 
 	"github.com/mmbros/quote/internal/quotegetter"
@@ -18,6 +17,14 @@ import (
 	"github.com/mmbros/quote/pkg/taskengine"
 )
 
+// SourceIsins struct represents the isins to get from a specific source
+type SourceIsins struct {
+	Source  string   `json:"source,omitempty"`
+	Workers int      `json:"workers,omitempty"`
+	Proxy   string   `json:"proxy,omitempty"`
+	Isins   []string `json:"isins,omitempty"`
+}
+
 var (
 	quoteGetter = make(map[string]quotegetter.QuoteGetter)
 )
@@ -25,15 +32,18 @@ var (
 func init() {
 	type fnNewQuoteGetter func(string) quotegetter.QuoteGetter
 
-	fnCryptonatorcomEUR := func(name string) quotegetter.QuoteGetter {
-		return cryptonatorcom.NewQuoteGetter(name, "EUR")
+	fnCryptonatorcom := func(currency string) fnNewQuoteGetter {
+		return func(name string) quotegetter.QuoteGetter {
+			return cryptonatorcom.NewQuoteGetter(name, currency)
+		}
 	}
 
 	src := map[string]fnNewQuoteGetter{
-		"fondidocit":     fondidocit.NewQuoteGetter,
-		"morningstarit":  morningstarit.NewQuoteGetter,
-		"fundsquarenet":  fundsquarenet.NewQuoteGetter,
-		"cryptonatorcom": fnCryptonatorcomEUR,
+		"fondidocit":         fondidocit.NewQuoteGetter,
+		"morningstarit":      morningstarit.NewQuoteGetter,
+		"fundsquarenet":      fundsquarenet.NewQuoteGetter,
+		"cryptonatorcom-EUR": fnCryptonatorcom("EUR"),
+		"cryptonatorcom-USD": fnCryptonatorcom("USD"),
 	}
 
 	for name, fn := range src {
@@ -43,41 +53,10 @@ func init() {
 
 }
 
-// getSources returns a list of the names of the available quoteGetters.
-func getSources() []string {
-
-	list := make([]string, 0, len(quoteGetter))
-	for name := range quoteGetter {
-		list = append(list, name)
-	}
-
-	return list
-}
-
-// Sources returns a sorted list of the names of the avaliable quoteGetters.
-func Sources() []string {
-	list := getSources()
-	sort.Strings(list)
-	return list
-}
-
-// getFilteresSources verified the passed sources names.
-// It returns nil if are all available, an error otherwise.
-func getFilteredSources(names []string) ([]string, error) {
-	if len(names) == 0 {
-		return getSources(), nil
-	}
-	for _, name := range names {
-		if _, ok := quoteGetter[name]; !ok {
-			return nil, fmt.Errorf("source not available: %q", name)
-		}
-	}
-	return names, nil
-}
-
 type taskGetQuote struct {
 	isin string
 	url  string
+	// proxy string
 }
 
 func (t *taskGetQuote) TaskID() taskengine.TaskID {
@@ -164,43 +143,45 @@ func dbInsert(dbpath string, results []*resultGetQuote) error {
 	return nil
 }
 
-// Get is ..
-func Get(isins []string, sources []string, workers []int, dbpath string) error {
+func checkListOfSourceIsins(items []SourceIsins) error {
+	used := map[string]struct{}{}
 
-	lenWorkers1 := len(workers) - 1
-	getSourceWorkers := func(idx int) int {
-		if idx > lenWorkers1 {
-			idx = lenWorkers1
+	for _, item := range items {
+
+		if _, ok := used[item.Source]; ok {
+			return fmt.Errorf("duplicate source %q", item.Source)
 		}
-		if idx < 0 {
-			return 1 // default number of instances
+		used[item.Source] = struct{}{}
+
+		if _, ok := quoteGetter[item.Source]; !ok {
+			return fmt.Errorf("source %q not available", item.Source)
 		}
-		return workers[idx]
+		if item.Workers <= 0 {
+			return fmt.Errorf("source %q with invalid workers %d", item.Source, item.Workers)
+		}
 	}
+	return nil
+}
 
-	// array of the used sources
-	filteredSources, err := getFilteredSources(sources)
-	if err != nil {
+// Get is ...
+func Get(items []SourceIsins, dbpath string) error {
+
+	// check input
+	if err := checkListOfSourceIsins(items); err != nil {
 		return err
 	}
 
-	// Tasks
-	ts := make(taskengine.Tasks, 0, len(isins))
-	for _, isin := range isins {
-		ts = append(ts, &taskGetQuote{isin, ""})
-	}
-
 	// Workers
-	ws := make([]*taskengine.Worker, 0, len(filteredSources))
+	ws := make([]*taskengine.Worker, 0, len(items))
 
 	// WorkerTasks
 	wts := make(taskengine.WorkerTasks)
 
-	for srcIdx, srcName := range filteredSources {
+	for _, item := range items {
 
-		qg := quoteGetter[srcName]
+		qg := quoteGetter[item.Source]
 
-		// work function for the named source
+		// work function of the source
 		wfn := func(ctx context.Context, inst int, task taskengine.Task) taskengine.Result {
 			t := task.(*taskGetQuote)
 			time1 := time.Now()
@@ -230,19 +211,28 @@ func Get(isins []string, sources []string, workers []int, dbpath string) error {
 					r.URL = e.URL
 				}
 			}
-
 			return r
 		}
 
+		// worker
 		w := &taskengine.Worker{
-			WorkerID:  taskengine.WorkerID(srcName),
-			Instances: getSourceWorkers(srcIdx),
+			WorkerID:  taskengine.WorkerID(item.Source),
+			Instances: item.Workers,
 			Work:      wfn,
 		}
 		ws = append(ws, w)
 
-		// set the same tasks for all the workers
+		// Tasks
+		ts := make(taskengine.Tasks, 0, len(item.Isins))
+		for _, isin := range item.Isins {
+			ts = append(ts, &taskGetQuote{
+				isin: isin,
+				url:  "",
+				// proxy: item.Proxy,
+			})
+		}
 		wts[w.WorkerID] = ts
+
 	}
 
 	wts.SortTasks()

@@ -102,7 +102,7 @@ func assertError(t *testing.T, err error, substr string, msgAndArgs ...interface
 
 	if err == nil || strings.Index(err.Error(), substr) < 0 {
 		msg := messageFromMsgAndArgs(msgAndArgs...)
-		t.Errorf("%s: expected error with substr %q, got: %v", msg, substr, err)
+		t.Errorf("%s: expected error with substr %q, got: %q", msg, substr, err)
 	}
 }
 
@@ -153,8 +153,8 @@ func TestParseArgSource(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		s, w, err := parseArgSource(tc.input, ":/#")
-		if tc.err && (err == nil) {
-			t.Errorf("Expected error for input %q", tc.input)
+		if tc.err {
+			assertError(t, err, "invalid source in args", tc.input)
 		}
 		if !tc.err {
 			if err != nil {
@@ -339,7 +339,8 @@ func TestArgsWorkers(t *testing.T) {
 			Workers:       tc.workers,
 			passedWorkers: tc.passed,
 			Isins:         []string{"isinY"},
-			Sources:       allSources1}
+			Sources:       allSources1,
+		}
 
 		cfg, err := getConfig(args, allSources1)
 		if err != nil {
@@ -354,8 +355,10 @@ func TestArgsWorkers(t *testing.T) {
 
 }
 
-func TestArgsWorkersError(t *testing.T) {
+func TestWorkersError(t *testing.T) {
+	//
 	// args.workers <= 0
+	//
 	initViperConfig(yamlConfig1)
 	args := &cmdGetArgs{
 		Workers:       0,
@@ -364,37 +367,43 @@ func TestArgsWorkersError(t *testing.T) {
 		Sources:       allSources1,
 	}
 	cfg, err := getConfig(args, allSources1)
-	if err == nil {
-		t.Errorf("Expected error with args.workers = %d", args.Workers)
-	}
+	assertError(t, err, "workers must be greater than zero", "args.workers")
 
-	// cfg.workers = 0
-	initViperConfig("workers: 0")
-	args = &cmdGetArgs{
-		Isins:   []string{"isinY"},
-		Sources: allSources1,
-	}
-	cfg, err = getConfig(args, allSources1)
-	assertEqualInt(t, cfg.Workers, defaultWorkers, "workers")
-
+	//
 	// cfg.workers = -1
+	//
 	args = &cmdGetArgs{
 		Isins:   []string{"isinY"},
 		Sources: allSources1,
 	}
 	initViperConfig("workers: -1")
 	cfg, err = getConfig(args, allSources1)
-	if err == nil {
-		t.Errorf("Expected error with cfg.workers = %d", -1)
-		t.Error(cfg)
+	assertError(t, err, "workers must be greater than zero", "cfg.workers")
+
+	//
+	// cfg.workers = 0
+	//
+	initViperConfig("workers: 0")
+	args = &cmdGetArgs{
+		Isins:   []string{"isinY"},
+		Sources: allSources1,
 	}
-	// t.Fatal(cfg)
+	cfg, err = getConfig(args, allSources1)
+
+	name := "source1"
+	if cfg.Sources[name] == nil {
+		t.Fatalf("source %q not found!", name)
+	}
+	assertEqualInt(t, defaultWorkers, cfg.Sources[name].Workers, "source[%q].workers", name)
 }
 
-func TestArgsDefault(t *testing.T) {
+func TestDefaults(t *testing.T) {
 	flgs := getCmd.Flags()
 
-	args := &cmdGetArgs{}
+	args := &cmdGetArgs{
+		Isins:   []string{"isinY"},
+		Sources: allSources1,
+	}
 	args.Workers, _ = flgs.GetInt("workers")
 	args.Proxy, _ = flgs.GetString("proxy")
 
@@ -404,8 +413,13 @@ func TestArgsDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertEqualInt(t, cfg.Workers, defaultWorkers, "workers")
-	assertEqualString(t, cfg.Proxy, "", "proxy")
+
+	name := "source1"
+	if cfg.Sources[name] == nil {
+		t.Fatalf("source %q not found!", name)
+	}
+	assertEqualInt(t, defaultWorkers, cfg.Sources[name].Workers, "source[%q].workers", name)
+	assertEqualString(t, cfg.Sources[name].Proxy, "", "source[%q].proxy", name)
 }
 
 func TestSourcesFilter(t *testing.T) {
@@ -552,4 +566,23 @@ func TestArgsDatabaase(t *testing.T) {
 		t.Errorf("Unexpected error: %v", err)
 	}
 	assertEqualString(t, db, cfg.Database, "database")
+}
+
+func TestString(t *testing.T) {
+	initViperConfig(yamlConfig1)
+	cfg, err := getConfig(nil, allSources1)
+	if err != nil {
+		t.Errorf("Unexpected error: %v", err)
+	}
+	t.Log(cfg)
+	// t.Fail()
+}
+
+func TestArgsInvalidSource(t *testing.T) {
+	initViperConfig(yamlConfig1)
+	args := &cmdGetArgs{
+		Sources: []string{"source:nan"},
+	}
+	_, err := getConfig(args, allSources1)
+	assertError(t, err, "invalid source in args")
 }

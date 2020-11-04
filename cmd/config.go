@@ -11,26 +11,26 @@ import (
 )
 
 type sourceItem struct {
-	Source   string
-	Workers  int
-	Proxy    string
-	Disabled bool
+	Source   string `json:"source,omitempty"`
+	Workers  int    `json:"workers,omitempty"`
+	Proxy    string `json:"proxy,omitempty"`
+	Disabled bool   `json:"disabled,omitempty"`
 }
 type isinItem struct {
-	Isin     string
-	Name     string
-	Disabled bool
-	Sources  []string
+	Isin     string   `json:"isin,omitempty"`
+	Name     string   `json:"name,omitempty"`
+	Disabled bool     `json:"disabled,omitempty"`
+	Sources  []string `json:"sources,omitempty"`
 }
 
 // Config is ...
 type Config struct {
-	Database string
-	Workers  int
-	Proxy    string
-	Proxies  map[string]string
-	Sources  map[string]*sourceItem
-	Isins    map[string]*isinItem
+	Database string                 `json:"database,omitempty"`
+	Workers  int                    `json:"workers,omitempty"`
+	Proxy    string                 `json:"proxy,omitempty"`
+	Proxies  map[string]string      `json:"proxies,omitempty"`
+	Sources  map[string]*sourceItem `json:"sources,omitempty"`
+	Isins    map[string]*isinItem   `json:"isins,omitempty"`
 }
 
 type cmdGetArgs struct {
@@ -193,7 +193,7 @@ func (cfg *Config) mergeArgs(args *cmdGetArgs) error {
 	// workers
 	if args.passedWorkers {
 		if args.Workers <= 0 {
-			return fmt.Errorf("workers must be greater than 0 (found %d)", cfg.Workers)
+			return fmt.Errorf("workers must be greater than zero (found %d)", cfg.Workers)
 		}
 		cfg.Workers = args.Workers
 	}
@@ -434,5 +434,10 @@ func getConfig(args *cmdGetArgs, allSources []string) (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	// set zero values of fields no more used
+	cfg.Proxies = nil
+	cfg.Workers = 0
+	cfg.Proxy = ""
+
 	return cfg, nil
 }
