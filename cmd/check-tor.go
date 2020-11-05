@@ -19,7 +19,8 @@ HTTP_PROXY, HTTPS_PROXY and NOPROXY enviroment variables.
 `,
 	Aliases: []string{"tor"},
 	Run: func(cmd *cobra.Command, args []string) {
-		_, msg, err := quote.TorCheck()
+		proxy, _ := cmd.Flags().GetString(nameProxy)
+		_, msg, err := quote.TorCheck(proxy)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err.Error())
 			os.Exit(2)
@@ -32,4 +33,6 @@ HTTP_PROXY, HTTPS_PROXY and NOPROXY enviroment variables.
 
 func init() {
 	rootCmd.AddCommand(checkTorCmd)
+
+	checkTorCmd.Flags().String(nameProxy, "p", "proxy to test the TOR connection")
 }

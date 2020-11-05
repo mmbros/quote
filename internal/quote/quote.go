@@ -8,11 +8,7 @@ import (
 	"time"
 
 	"github.com/mmbros/quote/internal/quotegetter"
-	"github.com/mmbros/quote/internal/quotegetter/cryptonatorcom"
 	"github.com/mmbros/quote/internal/quotegetter/scrapers"
-	"github.com/mmbros/quote/internal/quotegetter/scrapers/fondidocit"
-	"github.com/mmbros/quote/internal/quotegetter/scrapers/fundsquarenet"
-	"github.com/mmbros/quote/internal/quotegetter/scrapers/morningstarit"
 	"github.com/mmbros/quote/internal/quotegetterdb"
 	"github.com/mmbros/quote/pkg/taskengine"
 )
@@ -25,38 +21,9 @@ type SourceIsins struct {
 	Isins   []string `json:"isins,omitempty"`
 }
 
-var (
-	quoteGetter = make(map[string]quotegetter.QuoteGetter)
-)
-
-func init() {
-	type fnNewQuoteGetter func(string) quotegetter.QuoteGetter
-
-	fnCryptonatorcom := func(currency string) fnNewQuoteGetter {
-		return func(name string) quotegetter.QuoteGetter {
-			return cryptonatorcom.NewQuoteGetter(name, currency)
-		}
-	}
-
-	src := map[string]fnNewQuoteGetter{
-		"fondidocit":         fondidocit.NewQuoteGetter,
-		"morningstarit":      morningstarit.NewQuoteGetter,
-		"fundsquarenet":      fundsquarenet.NewQuoteGetter,
-		"cryptonatorcom-EUR": fnCryptonatorcom("EUR"),
-		"cryptonatorcom-USD": fnCryptonatorcom("USD"),
-	}
-
-	for name, fn := range src {
-		qg := fn(name)
-		quoteGetter[qg.Name()] = qg
-	}
-
-}
-
 type taskGetQuote struct {
 	isin string
 	url  string
-	// proxy string
 }
 
 func (t *taskGetQuote) TaskID() taskengine.TaskID {
@@ -143,7 +110,7 @@ func dbInsert(dbpath string, results []*resultGetQuote) error {
 	return nil
 }
 
-func checkListOfSourceIsins(items []SourceIsins) error {
+func checkListOfSourceIsins(items []*SourceIsins) error {
 	used := map[string]struct{}{}
 
 	for _, item := range items {
@@ -153,7 +120,7 @@ func checkListOfSourceIsins(items []SourceIsins) error {
 		}
 		used[item.Source] = struct{}{}
 
-		if _, ok := quoteGetter[item.Source]; !ok {
+		if _, ok := availableSources[item.Source]; !ok {
 			return fmt.Errorf("source %q not available", item.Source)
 		}
 		if item.Workers <= 0 {
@@ -164,7 +131,7 @@ func checkListOfSourceIsins(items []SourceIsins) error {
 }
 
 // Get is ...
-func Get(items []SourceIsins, dbpath string) error {
+func Get(items []*SourceIsins, dbpath string) error {
 
 	// check input
 	if err := checkListOfSourceIsins(items); err != nil {
@@ -176,6 +143,8 @@ func Get(items []SourceIsins, dbpath string) error {
 
 	// WorkerTasks
 	wts := make(taskengine.WorkerTasks)
+
+	quoteGetter := initQuoteGetters(items)
 
 	for _, item := range items {
 
@@ -205,7 +174,13 @@ func Get(items []SourceIsins, dbpath string) error {
 			}
 			if err != nil {
 				r.ErrMsg = err.Error()
+				// FIXME
 				if e, ok := err.(*scrapers.Error); ok {
+					r.Isin = e.Isin
+					r.Source = e.Name
+					r.URL = e.URL
+				}
+				if e, ok := err.(*quotegetter.Error); ok {
 					r.Isin = e.Isin
 					r.Source = e.Name
 					r.URL = e.URL

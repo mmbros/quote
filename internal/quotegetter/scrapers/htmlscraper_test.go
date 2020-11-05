@@ -104,9 +104,12 @@ func newTestScraper(name, url string) *testScraper {
 }
 
 func (scr testScraper) Name() string {
-	return string(scr.name)
+	return scr.name
 }
 
+func (scr testScraper) Client() *http.Client {
+	return nil
+}
 func (scr testScraper) GetSearch(ctx context.Context, isin string) (*http.Request, error) {
 
 	tc := testCasesGetQuote[isin]

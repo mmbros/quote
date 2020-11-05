@@ -16,6 +16,7 @@ import (
 // Scraper interface
 type Scraper interface {
 	Name() string
+	Client() *http.Client
 	GetSearch(ctx context.Context, isin string) (*http.Request, error)
 	ParseSearch(doc *goquery.Document, isin string) (string, error)
 	GetInfo(ctx context.Context, isin, url string) (*http.Request, error)
@@ -139,7 +140,7 @@ func getQuote(ctx context.Context, isin, url string, scr Scraper) (*quotegetter.
 
 		// reqSearch can be nil if the Info URL can be build from isin only
 		if req != nil && err == nil {
-			resp, err = quotegetter.DoHTTPRequest(req)
+			resp, err = quotegetter.DoHTTPRequest(scr.Client(), req)
 		}
 		if err != nil {
 			return theError(err, GetSearchError)
@@ -196,7 +197,7 @@ func getQuote(ctx context.Context, isin, url string, scr Scraper) (*quotegetter.
 		if req == nil {
 			return theError(ErrInfoRequestIsNil, GetInfoError)
 		}
-		resp, err = quotegetter.DoHTTPRequest(req)
+		resp, err = quotegetter.DoHTTPRequest(scr.Client(), req)
 	}
 	if err != nil {
 		return theError(err, GetInfoError)

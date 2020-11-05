@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/viper"
 )
 
@@ -38,21 +40,21 @@ isins:
       - source2
 `
 
-// set of string type
-type set map[string]struct{}
+// // set of string type
+// type set map[string]struct{}
 
-func newSet(keys []string) set {
-	s := set{}
-	for _, k := range keys {
-		s[k] = struct{}{}
-	}
-	return s
-}
+// func newSet(keys []string) set {
+// 	s := set{}
+// 	for _, k := range keys {
+// 		s[k] = struct{}{}
+// 	}
+// 	return s
+// }
 
-func (s set) has(key string) bool {
-	_, ok := s[key]
-	return ok
-}
+// func (s set) has(key string) bool {
+// 	_, ok := s[key]
+// 	return ok
+// }
 
 func messageFromMsgAndArgs(msgAndArgs ...interface{}) string {
 	if len(msgAndArgs) == 0 || msgAndArgs == nil {
@@ -174,7 +176,7 @@ func TestFullNotValidatedConfig(t *testing.T) {
 
 	args := &cmdGetArgs{
 		Proxy:       "arg://proxy",
-		passedProxy: true,
+		PassedProxy: true,
 		Isins:       []string{"isin1", "isinY"},
 		Sources:     []string{"source1#101", "source2", "sourceY/12"},
 	}
@@ -287,7 +289,7 @@ func TestArgsProxy(t *testing.T) {
 
 		args := &cmdGetArgs{
 			Proxy:       tc.proxy,
-			passedProxy: tc.passed,
+			PassedProxy: tc.passed,
 			Isins:       []string{"isinY"},
 			Sources:     allSources1,
 		}
@@ -337,7 +339,7 @@ func TestArgsWorkers(t *testing.T) {
 	for _, tc := range testCases {
 		args := &cmdGetArgs{
 			Workers:       tc.workers,
-			passedWorkers: tc.passed,
+			PassedWorkers: tc.passed,
 			Isins:         []string{"isinY"},
 			Sources:       allSources1,
 		}
@@ -362,7 +364,7 @@ func TestWorkersError(t *testing.T) {
 	initViperConfig(yamlConfig1)
 	args := &cmdGetArgs{
 		Workers:       0,
-		passedWorkers: true,
+		PassedWorkers: true,
 		Isins:         []string{"isinY"},
 		Sources:       allSources1,
 	}
@@ -442,16 +444,31 @@ isins:
 }
 
 func TestSourcesUnknown(t *testing.T) {
+	// 1. unknown source in config
 	initViperConfig(`
 isins:
 - isin: isin1
   sources: [source1, sourceZ]
 `)
 	cfg, err := getConfig(nil, allSources1)
-	assertError(t, err, "unknown source", "isin1")
+	assertError(t, err, "required source", "unknown source in config")
+
+	// 2. unknown source in args
+	args := &cmdGetArgs{
+		Isins:   []string{"isinY"},
+		Sources: []string{"sourceY"},
+	}
+	initViperConfig("")
+	cfg, err = getConfig(args, allSources1)
+	assertError(t, err, "required source", "unknown source in args")
 	if t.Failed() {
 		t.Log(cfg)
 	}
+
+	if t.Failed() {
+		t.Log(cfg)
+	}
+
 }
 
 func TestSourcesEmpty(t *testing.T) {
@@ -556,7 +573,7 @@ func TestArgsDatabaase(t *testing.T) {
 	db := "/home/user/config.toml"
 	args := &cmdGetArgs{
 		Database:       db,
-		passedDatabase: true,
+		PassedDatabase: true,
 		Isins:          []string{"isinY"},
 		Sources:        allSources1,
 	}
@@ -585,4 +602,98 @@ func TestArgsInvalidSource(t *testing.T) {
 	}
 	_, err := getConfig(args, allSources1)
 	assertError(t, err, "invalid source in args")
+}
+
+func TestIsinSources(t *testing.T) {
+	const isinY = "isinY"
+
+	testCases := []struct {
+		title           string
+		args            *cmdGetArgs
+		config          string
+		allSources      []string
+		expectedSources []string
+	}{
+		{
+			title: "isinY in config: no source in args, no source in config",
+			args:  nil,
+			config: `isins: 
+- isin: ` + isinY,
+			allSources:      allSources1,
+			expectedSources: allSources1,
+		},
+		{
+			title: "isinY in args: no source in args, no source in config",
+			args: &cmdGetArgs{
+				Isins: []string{isinY},
+			},
+			config:          "",
+			allSources:      allSources1,
+			expectedSources: allSources1,
+		},
+		{
+			title: "isinY in args: source in args overwrite source in config",
+			args: &cmdGetArgs{
+				Isins:   []string{isinY},
+				Sources: []string{"source3", "sourceX"},
+			},
+			config: `
+isins:
+  - isin: isinY
+    sources: [source1, source2]
+`,
+			allSources:      allSources1,
+			expectedSources: []string{"sourceX", "source3"},
+		},
+		{
+			title: "isinY in args: source in args are used even if disabled",
+			args: &cmdGetArgs{
+				Isins:   []string{isinY},
+				Sources: []string{"source3", "sourceX"},
+			},
+			config: `
+sources:
+  - source: source3
+    disabled: yes
+`,
+			allSources:      allSources1,
+			expectedSources: []string{"sourceX", "source3"},
+		},
+		{
+			title: "no source in args: sources disabled are not used",
+			args:  nil,
+			config: `
+isins:
+  - isin: isinY
+sources:
+  - source: source3
+    disabled: yes
+`,
+			allSources:      allSources1,
+			expectedSources: []string{"sourceX", "source1", "source2"},
+		},
+	}
+	copts := cmp.Options{
+		cmpopts.SortSlices(func(a, b string) bool {
+			return a < b
+		}),
+	}
+
+	for _, tc := range testCases {
+		initViperConfig(tc.config)
+		cfg, err := getConfig(tc.args, tc.allSources)
+		if err != nil {
+			t.Errorf("%s: error unexpected: %v", tc.title, err)
+		} else if cfg.Isins[isinY] == nil {
+			t.Errorf("%s: ???: %s not found in cfg", tc.title, isinY)
+		} else if diff := cmp.Diff(tc.expectedSources, cfg.Isins[isinY].Sources, copts); diff != "" {
+			t.Errorf("%s: mismatch (-want +got):\n%s", tc.title, diff)
+		}
+
+		if t.Failed() {
+			t.Log(cfg)
+		}
+
+	}
+
 }

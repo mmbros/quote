@@ -44,7 +44,7 @@ func TestDoHTTPRequestWithTimeout(t *testing.T) {
 	}
 
 	// do
-	_, err = DoHTTPRequest(req)
+	_, err = DoHTTPRequest(nil, req)
 
 	// check
 	if err == nil {
@@ -94,7 +94,7 @@ func TestDoHTTPRequestWithCancel(t *testing.T) {
 	}
 
 	// do
-	_, err = DoHTTPRequest(req)
+	_, err = DoHTTPRequest(nil, req)
 
 	// check
 	if err == nil {
@@ -136,7 +136,7 @@ func TestDoHTTPRequestOK(t *testing.T) {
 	}
 
 	// do
-	resp, err := DoHTTPRequest(req)
+	resp, err := DoHTTPRequest(nil, req)
 
 	// check
 	if err != nil {
@@ -173,7 +173,7 @@ func TestDoHTTPRequestKO(t *testing.T) {
 	}
 
 	// do
-	_, err = DoHTTPRequest(req)
+	_, err = DoHTTPRequest(nil, req)
 
 	// check
 	if err == nil {

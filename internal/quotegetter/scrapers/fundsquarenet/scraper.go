@@ -11,50 +11,47 @@ import (
 	"github.com/mmbros/quote/internal/quotegetter/scrapers"
 )
 
-// scraper gets stock/fund prices from www.fundsquare.net
-type scraper string
-
-// func init() {
-// 	const name = "fundsquarenet"
-// 	scrapers.Register(newScraper(name))
-// }
-
-// NewScraper creates a new scrapers
-// that gets stock/fund prices from www.fundsquare.net
-// func NewScraper(name string) scrapers.HTMLQuoteScraper {
-// 	return scraper(name)
-// }
+// scraper gets stock/fund prices from fundsquare.net
+type scraper struct {
+	name   string
+	client *http.Client
+}
 
 // NewQuoteGetter creates a new QuoteGetter
-// that gets stock/fund prices from www.fundsquare.net
-func NewQuoteGetter(name string) quotegetter.QuoteGetter {
-	return scrapers.NewQuoteGetter(scraper(name))
+// that gets stock/fund prices from fundsquare.net
+func NewQuoteGetter(name string, client *http.Client) quotegetter.QuoteGetter {
+	return scrapers.NewQuoteGetter(&scraper{name, client})
 }
 
 // Name returns the name of the scraper
-func (p scraper) Name() string {
-	return string(p)
+func (s *scraper) Name() string {
+	return s.name
+}
+
+// Client returns the http.Client of the scraper
+func (s *scraper) Client() *http.Client {
+	return s.client
 }
 
 // GetSearch executes the http GET of the search page for the specified `isin`.
 // It returns the http.Response or nil if the scraper can build the url of the info page
 // directly from the `isin`.
 // The response document will be parsed by ParseSearch to extract the info url.
-func (p scraper) GetSearch(ctx context.Context, isin string) (*http.Request, error) {
+func (s *scraper) GetSearch(ctx context.Context, isin string) (*http.Request, error) {
 	return nil, nil
 }
 
 // ParseSearch parse the html of the search page to find the URL of the info page.
 // `doc` can be nil if the url of the info page can be build directly from the `isin`.
 // It returns the url of the info page.
-func (p scraper) ParseSearch(doc *goquery.Document, isin string) (string, error) {
+func (s *scraper) ParseSearch(doc *goquery.Document, isin string) (string, error) {
 	url := fmt.Sprintf("https://www.fundsquare.net/search-results?ajaxContentView=renderContent"+
 		"&=undefined&search=%s&isISIN=O&lang=EN&fastSearch=O", isin)
 	return url, nil
 }
 
 // GetInfo is ...
-func (p scraper) GetInfo(ctx context.Context, isin, url string) (*http.Request, error) {
+func (s *scraper) GetInfo(ctx context.Context, isin, url string) (*http.Request, error) {
 
 	// headers of the http request
 	headers := map[string]string{
@@ -80,7 +77,7 @@ func (p scraper) GetInfo(ctx context.Context, isin, url string) (*http.Request, 
 }
 
 // ParseInfo is ...
-func (p scraper) ParseInfo(doc *goquery.Document, isin string) (*scrapers.ParseInfoResult, error) {
+func (s *scraper) ParseInfo(doc *goquery.Document, isin string) (*scrapers.ParseInfoResult, error) {
 	// SCENARIO OK
 	// -----------
 	// <div id="content">

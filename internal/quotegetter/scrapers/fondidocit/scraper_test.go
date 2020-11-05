@@ -11,7 +11,7 @@ import (
 )
 
 func getTestScraper() scrapers.Scraper {
-	return scraper("fondidocit")
+	return &scraper{"fondidocit", nil}
 }
 
 func checkError(t *testing.T, prefix string, found, expected error) bool {
@@ -30,7 +30,7 @@ func checkError(t *testing.T, prefix string, found, expected error) bool {
 
 func TestName(t *testing.T) {
 	const expected = "dummy"
-	scr := scraper(expected)
+	scr := &scraper{expected, nil}
 	if actual := scr.Name(); actual != expected {
 		t.Errorf("Name: expected %q, found %q", expected, actual)
 	}

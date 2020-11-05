@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/mmbros/quote/internal/quote"
 	"github.com/spf13/cobra"
 
 	homedir "github.com/mitchellh/go-homedir"
@@ -21,11 +20,12 @@ var rootCmd = &cobra.Command{
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	//	Run: func(cmd *cobra.Command, args []string) { },
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 
-		// handle --proxy flag
-		quote.InitClient(viper.GetViper().GetString("proxy"))
-	},
+	// PersistentPreRun: func(cmd *cobra.Command, args []string) {
+
+	// 	// handle --proxy flag
+	// 	quote.InitClient(viper.GetViper().GetString("proxy"))
+	// },
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -45,8 +45,8 @@ func init() {
 	// will be global for your application.
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.quote.yaml)")
-	rootCmd.PersistentFlags().String("proxy", "", "http(s) proxy")
 	rootCmd.PersistentFlags().String("database", "", "quote sqlite3 database")
+	rootCmd.PersistentFlags().String("proxy", "", "default proxy")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.

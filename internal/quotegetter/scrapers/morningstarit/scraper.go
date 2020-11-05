@@ -11,35 +11,32 @@ import (
 )
 
 // scraper gets stock/fund prices from www.morningstar.it
-type scraper string
-
-// func init() {
-// 	const name = "morningstarit"
-// 	scrapers.Register(NewScraper(name))
-// }
-
-// NewScraper creates a new scrapers
-// that gets stock/fund prices from www.morningstar.it
-// func NewScraper(name string) scrapers.HTMLQuoteScraper {
-// 	return scraper(name)
-// }
+type scraper struct {
+	name   string
+	client *http.Client
+}
 
 // NewQuoteGetter creates a new QuoteGetter
-// that gets stock/fund prices from www.fundsquare.net
-func NewQuoteGetter(name string) quotegetter.QuoteGetter {
-	return scrapers.NewQuoteGetter(scraper(name))
+// that gets stock/fund prices from www.morningstar.it
+func NewQuoteGetter(name string, client *http.Client) quotegetter.QuoteGetter {
+	return scrapers.NewQuoteGetter(&scraper{name, client})
 }
 
 // Name returns the name of the scraper
-func (scr scraper) Name() string {
-	return string(scr)
+func (s *scraper) Name() string {
+	return s.name
+}
+
+// Client returns the http.Client of the scraper
+func (s *scraper) Client() *http.Client {
+	return s.client
 }
 
 // GetSearch executes the http GET of the search page for the specified `isin`.
 // It returns the http.Response or nil if the scraper can build the url of the info page
 // directly from the `isin`.
 // The response document will be parsed by ParseSearch to extract the info url.
-func (scr scraper) GetSearch(ctx context.Context, isin string) (*http.Request, error) {
+func (s *scraper) GetSearch(ctx context.Context, isin string) (*http.Request, error) {
 	url := fmt.Sprintf("https://www.morningstar.it/it/funds/SecuritySearchResults.aspx?search=%s&type=", isin)
 	return http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 }
@@ -47,7 +44,7 @@ func (scr scraper) GetSearch(ctx context.Context, isin string) (*http.Request, e
 // ParseSearch parse the html of the search page to find the URL of the info page.
 // `doc` can be nil if the url of the info page can be build directly from the `isin`.
 // It returns the url of the info page.
-func (scr scraper) ParseSearch(doc *goquery.Document, isin string) (string, error) {
+func (s *scraper) ParseSearch(doc *goquery.Document, isin string) (string, error) {
 	/*
 		### SUCCESS
 		<table id="ctl00_MainContent_fundTable" style="border-collapse:collapse;" cellspacing="0" cellpadding="0" border="0">
@@ -81,12 +78,12 @@ func (scr scraper) ParseSearch(doc *goquery.Document, isin string) (string, erro
 // GetInfo executes the http GET of the `url` of info page for the specified `isin`.
 // `url` and `isin` must be defined.
 // The response document will be parsed by ParseInfo to extract the info url.
-func (scr scraper) GetInfo(ctx context.Context, isin, url string) (*http.Request, error) {
+func (s *scraper) GetInfo(ctx context.Context, isin, url string) (*http.Request, error) {
 	return http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 }
 
 // ParseInfo is ...
-func (scr scraper) ParseInfo(doc *goquery.Document, isin string) (*scrapers.ParseInfoResult, error) {
+func (s *scraper) ParseInfo(doc *goquery.Document, isin string) (*scrapers.ParseInfoResult, error) {
 	/*
 		<table class="snapshotTextColor snapshotTextFontStyle snapshotTable overviewKeyStatsTable" border="0">
 		  <tbody>

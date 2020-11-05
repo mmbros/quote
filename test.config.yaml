@@ -6,7 +6,7 @@
 # database: .quote.sqlite3
 
 # default number of workers for each source
-workers: 3
+workers: 2
 
 # default proxy
 proxy: none

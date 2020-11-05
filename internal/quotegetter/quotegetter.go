@@ -2,6 +2,7 @@ package quotegetter
 
 import (
 	"context"
+	"net/http"
 	"strings"
 	"time"
 )
@@ -9,6 +10,7 @@ import (
 // QuoteGetter interface
 type QuoteGetter interface {
 	Name() string
+	Client() *http.Client
 	GetQuote(ctx context.Context, isin, url string) (*Result, error)
 }
 
@@ -29,4 +31,16 @@ func NormalizeCurrency(currency string) string {
 		return "EUR"
 	}
 	return currency
+}
+
+// Error is
+type Error struct {
+	Name string
+	Isin string
+	URL  string
+	Err  error
+}
+
+func (e *Error) Error() string {
+	return e.Err.Error()
 }

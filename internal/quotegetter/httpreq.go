@@ -7,13 +7,6 @@ import (
 	"time"
 )
 
-// Client is the http.Client used for the quote requests.
-var Client *http.Client
-
-func init() {
-	Client = DefaultClient("")
-}
-
 // DefaultClient xxx
 func DefaultClient(proxy string) *http.Client {
 	// tr := &http.Transport{}
@@ -28,17 +21,21 @@ func DefaultClient(proxy string) *http.Client {
 		tr.Proxy = http.ProxyURL(proxyURL)
 	}
 
-	return &http.Client{
+	client := &http.Client{
 		Transport: tr,
 		Timeout:   10 * time.Second,
 	}
+	return client
 }
 
 // DoHTTPRequest executes the http request.
-func DoHTTPRequest(req *http.Request) (*http.Response, error) {
-	resp, err := Client.Do(req)
+func DoHTTPRequest(client *http.Client, req *http.Request) (*http.Response, error) {
+	if client == nil {
+		client = DefaultClient("")
+	}
+	resp, err := client.Do(req)
 	if (err == nil) && (resp.StatusCode != http.StatusOK) {
-		err = fmt.Errorf("Get %q with response status = %v", req.URL, resp.Status)
+		err = fmt.Errorf("%s %q with response status = %v", req.Method, req.URL, resp.Status)
 	}
 	return resp, err
 }

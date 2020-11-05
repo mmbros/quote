@@ -7,7 +7,12 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/mmbros/quote/internal/quote"
 	"github.com/spf13/viper"
+)
+
+const (
+	errmsgSourceNotAvailable = "required source %q is not available"
 )
 
 type sourceItem struct {
@@ -40,32 +45,42 @@ type cmdGetArgs struct {
 	Sources        []string
 	Isins          []string
 	DryRun         bool
-	passedDatabase bool
-	passedWorkers  bool
-	passedProxy    bool
+	PassedDatabase bool
+	PassedWorkers  bool
+	PassedProxy    bool
 }
 
-// // set of string type
-// type set map[string]struct{}
+// set of string type
+type set map[string]struct{}
 
-// func newSet(keys []string) set {
-// 	s := set{}
-// 	for _, k := range keys {
-// 		s[k] = struct{}{}
-// 	}
-// 	return s
-// }
+func newSet(keys []string) set {
+	s := set{}
+	for _, k := range keys {
+		s[k] = struct{}{}
+	}
+	return s
+}
 
-// func (s set) has(key string) bool {
-// 	_, ok := s[key]
-// 	return ok
-// }
+func (s set) has(key string) bool {
+	_, ok := s[key]
+	return ok
+}
 
-// String returns a json string representation of the config.
-func (cfg *Config) String() string {
+// String returns a json string representation of the object.
+func jsonString(obj interface{}) string {
 	// print config
-	json, _ := json.MarshalIndent(cfg, "", "  ")
+	json, _ := json.MarshalIndent(obj, "", "  ")
 	return string(json)
+}
+
+// String returns a json string representation of the Config.
+func (cfg *Config) String() string {
+	return jsonString(cfg)
+}
+
+// String returns a json string representation of the cmdGetArgs.
+func (args *cmdGetArgs) String() string {
+	return jsonString(args)
 }
 
 // readSources init the proxies from config file.
@@ -169,14 +184,18 @@ func (cfg *Config) readConfig(vip *viper.Viper) error {
 	cfg.Proxy = vip.GetString("proxy")
 	cfg.Workers = vip.GetInt("workers")
 
+	reterr := func(err error, section string) error {
+		return fmt.Errorf("Error reading config file: section %q: %v", section, err.Error())
+	}
+
 	if err := cfg.readProxies(vip); err != nil {
-		return err
+		return reterr(err, "proxies")
 	}
 	if err := cfg.readSources(vip); err != nil {
-		return err
+		return reterr(err, "sources")
 	}
 	if err := cfg.readIsins(vip); err != nil {
-		return err
+		return reterr(err, "isins")
 	}
 
 	return nil
@@ -191,7 +210,7 @@ func (cfg *Config) mergeArgs(args *cmdGetArgs) error {
 	}
 
 	// workers
-	if args.passedWorkers {
+	if args.PassedWorkers {
 		if args.Workers <= 0 {
 			return fmt.Errorf("workers must be greater than zero (found %d)", cfg.Workers)
 		}
@@ -199,12 +218,12 @@ func (cfg *Config) mergeArgs(args *cmdGetArgs) error {
 	}
 
 	// proxy
-	if args.passedProxy {
+	if args.PassedProxy {
 		cfg.Proxy = args.Proxy
 	}
 
 	// database
-	if args.passedDatabase {
+	if args.PassedDatabase {
 		cfg.Database = args.Database
 	}
 
@@ -238,6 +257,8 @@ func (cfg *Config) mergeArgs(args *cmdGetArgs) error {
 	// Other sources in config are disabled.
 	// If in args the number of workers is specified for a source,
 	// the args workers value overwrite the config workers value.
+	// The isin.sources of the config file will be ignored:
+	// all the isins will use all and only the args.sources
 	if len(args.Sources) > 0 {
 		// disable all the existing config sources
 		for _, s := range cfg.Sources {
@@ -264,6 +285,11 @@ func (cfg *Config) mergeArgs(args *cmdGetArgs) error {
 				cfg.Sources[s] = source
 			}
 		}
+		// update Isins.sources
+		for _, i := range cfg.Isins {
+			i.Sources = args.Sources
+		}
+
 	}
 	return nil
 }
@@ -314,7 +340,7 @@ func getFullNotValidatedConfig(args *cmdGetArgs, allSources []string) (*Config, 
 // - filter (consider only used isin, source and proxy)
 // - check
 // - insert defaults and references
-func (cfg *Config) checkAndSimplify() error {
+func (cfg *Config) checkAndSimplify(allSources []string) error {
 
 	// check workers
 
@@ -333,7 +359,7 @@ func (cfg *Config) checkAndSimplify() error {
 	// map of (enabled) sources explicitly referenced by isins
 	refSources := map[string]*sourceItem{}
 
-	// check anf filter isins
+	// check and filter isins
 	for i, isin := range cfg.Isins {
 		// remove disabled ISIN
 		// see: https://stackoverflow.com/questions/23229975/is-it-safe-to-remove-selected-keys-from-map-within-a-range-loop
@@ -351,7 +377,7 @@ func (cfg *Config) checkAndSimplify() error {
 				source, ok := cfg.Sources[s]
 				if !ok {
 					// source not exists
-					return fmt.Errorf("isin %q with unknown source %q", i, s)
+					return fmt.Errorf(errmsgSourceNotAvailable, s)
 				}
 				if !source.Disabled {
 					allEnabledSources = append(allEnabledSources, s)
@@ -391,8 +417,15 @@ func (cfg *Config) checkAndSimplify() error {
 		cfg.Sources = refSources
 	}
 
+	setOfAllSources := newSet(allSources)
+
 	// set proxy and workers of each source
 	for _, source := range cfg.Sources {
+
+		// check source is available
+		if !setOfAllSources.has(source.Source) {
+			return fmt.Errorf(errmsgSourceNotAvailable, source.Source)
+		}
 
 		// workers
 		if source.Workers < 0 {
@@ -429,15 +462,52 @@ func (cfg *Config) checkAndSimplify() error {
 func getConfig(args *cmdGetArgs, allSources []string) (*Config, error) {
 	cfg, err := getFullNotValidatedConfig(args, allSources)
 	if err == nil {
-		err = cfg.checkAndSimplify()
+		err = cfg.checkAndSimplify(allSources)
 	}
 	if err != nil {
 		return nil, err
 	}
+	// clean config
 	// set zero values of fields no more used
 	cfg.Proxies = nil
 	cfg.Workers = 0
 	cfg.Proxy = ""
 
 	return cfg, nil
+}
+
+func getSourceIsinsList(args *cmdGetArgs, allSources []string) ([]*quote.SourceIsins, error) {
+	cfg, err := getFullNotValidatedConfig(args, allSources)
+	if err == nil {
+		err = cfg.checkAndSimplify(allSources)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// build a map from source to isins
+	m := map[string][]string{}
+	for _, i := range cfg.Isins {
+		for _, s := range i.Sources {
+			a := m[s]
+			if a == nil {
+				a = []string{i.Isin}
+			} else {
+				a = append(a, i.Isin)
+			}
+			m[s] = a
+		}
+	}
+
+	sis := make([]*quote.SourceIsins, 0, len(cfg.Sources))
+	for _, src := range cfg.Sources {
+		si := &quote.SourceIsins{
+			Source:  src.Source,
+			Proxy:   src.Proxy,
+			Workers: src.Workers,
+			Isins:   m[src.Source],
+		}
+		sis = append(sis, si)
+	}
+	return sis, err
 }

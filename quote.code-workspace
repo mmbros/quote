@@ -9,6 +9,8 @@
 		"version": "0.2.0",
 		"configurations": [		
 
+
+
 		
 
 
@@ -23,13 +25,22 @@
 				"args": []
 			},
 			{
-				"name": "tor-check",
+				"name": "CMD tor-check with ENV",
 				"type": "go",
 				"request": "launch",
 				"mode": "auto",
 				"program": "${workspaceFolder}/main.go",
 				"env": {"HTTPS_PROXY": "socks5://127.0.0.1:9050"},
 				"args": ["tor-check"]
+			},
+			{
+				"name": "CMD tor-check with proxy parameter",
+				"type": "go",
+				"request": "launch",
+				"mode": "auto",
+				"program": "${workspaceFolder}/main.go",
+				"env": {},
+				"args": ["tor-check", "--proxy", "socks5://127.0.0.1:9050"]
 			},
 			{
 				"name": "Get CMD",
@@ -42,14 +53,15 @@
 					"--dry-run"]
 			},		
 			{
-				"name": "Get",
+				"name": "CMD Get",
 				"type": "go",
 				"request": "launch",
 				"mode": "auto",
 				"program": "${workspaceFolder}/main.go",
-				"env": {"HTTPS_PROXY": "socks5://127.0.0.1:9050"},
-				"args": ["get", "--tor"]
-			}		
+				"env": {},
+				"args": ["get", "-i", "XYZ",  "--config", "test.config.yaml", 
+					"-s", "cryptonatorcom-EUR"]
+			}
 		]
 	}
 }

@@ -8,12 +8,12 @@ import (
 )
 
 func getTestScraper() scrapers.Scraper {
-	return scraper("morningstarit")
+	return &scraper{"morningstarit", nil}
 }
 
 func TestName(t *testing.T) {
 	const name = "dummy"
-	scr := scraper(name)
+	scr := &scraper{name, nil}
 	if nameFound := scr.Name(); nameFound != name {
 		t.Errorf("Name: found %q, expected %q", nameFound, name)
 	}

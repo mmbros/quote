@@ -1,7 +1,11 @@
 package cmd
 
 import (
+	"fmt"
+
+	"github.com/mmbros/quote/internal/quote"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 const (
@@ -14,8 +18,9 @@ const (
 	nameSource  = "sources"
 	nameWorkers = "workers"
 	nameProxy   = "proxy"
-	nameTor     = "tor"
-	nameDryRun  = "dry-run"
+	// nameTor      = "tor"
+	nameDryRun   = "dry-run"
+	nameDatabase = "database"
 )
 
 // getCmd represents the get command
@@ -29,68 +34,42 @@ See 'quote sources' for a list of the available sources.
 `,
 	RunE: func(cmd *cobra.Command, args []string) error {
 
-		// 		// _, err := readConfig(cmd)
-		// 		// if err != nil {
-		// 		// 	return err
-		// 		// }
-		// 		vip := viper.GetViper()
+		// build cmdGetArgs
+		fgs := cmd.Flags()
+		a := &cmdGetArgs{
+			PassedDatabase: fgs.Changed(nameDatabase),
+			PassedWorkers:  fgs.Changed(nameWorkers),
+			PassedProxy:    fgs.Changed(nameProxy),
+		}
+		a.DryRun, _ = fgs.GetBool(nameDryRun)
+		a.Database, _ = fgs.GetString(nameDatabase)
+		a.Workers, _ = fgs.GetInt(nameWorkers)
+		a.Proxy, _ = fgs.GetString(nameProxy)
+		a.Isins, _ = fgs.GetStringSlice(nameIsin)
+		a.Sources, _ = fgs.GetStringSlice(nameSource)
 
-		// 		sourceWorkers, err := cmd.Flags().GetStringSlice(nameSource)
+		sis, err := getSourceIsinsList(a, quote.Sources())
 
-		// 		// get the parameters of the get function
-		// 		isins := vip.GetStringSlice(nameIsin)
-		// 		defaultWorkers := vip.GetInt(nameWorkers)
-		// 		torIsMandatory := vip.GetBool(nameTor)
-		// 		sources, workers, err := parseSources(
-		// 			sourceWorkers,
-		// 			defaultWorkers,
-		// 		)
-		// 		if err != nil {
-		// 			return err
-		// 		}
-		// 		database := vip.GetString("database")
-		// 		proxy := vip.GetString("proxy")
-		// 		return nil
+		if a.DryRun {
+			fmt.Printf("%v\n", a)
 
-		// 		// handle --dry-run flag
-		// 		if vip.GetBool(nameDryRun) {
-		// 			fmt.Printf(`
-		// quote get:
-		//           config: %s
-		//            isins: %v
-		//          sources: %v
-		//          workers: %v
-		//   defaultWorkers: %d
-		//              tor: %v
-		//            proxy: %s
-		//         database: %s
-		// `,
-		// 				viper.ConfigFileUsed(),
-		// 				isins,
-		// 				sources,
-		// 				workers,
-		// 				defaultWorkers,
-		// 				torIsMandatory,
-		// 				proxy,
-		// 				database)
+			configFile := viper.GetViper().ConfigFileUsed()
+			fmt.Printf("Using configuration file %q\n", configFile)
 
-		// 			return nil
-		// 		}
+			fmt.Println(jsonString(sis))
 
-		// 		// handle --tor flag
-		// 		if torIsMandatory {
-		// 			ok, _, err := quote.TorCheck()
-		// 			if !ok && err == nil {
-		// 				err = fmt.Errorf("Tor network not available")
-		// 			}
-		// 			if err != nil {
-		// 				return err
-		// 			}
-		// 		}
+			if err != nil {
+				fmt.Printf("ERROR: %v\n", err)
+			}
 
-		// 		// retrieves the quotes
-		// 		return quote.Get(isins, sources, workers, database)
-		return nil
+			return nil
+		}
+
+		// do retrieves the quotes
+		if err == nil {
+			err = quote.Get(sis, a.Database)
+		}
+		return err
 	},
 
 	Example: `    quote get -i isin1,isin2 -s sourceA/4,sourceB, -s sourceC --workers 2
@@ -112,7 +91,7 @@ func init() {
 	flgs := getCmd.Flags()
 
 	flgs.BoolP(nameDryRun, "n", false, "perform a trial run with no request/updates made")
-	flgs.Bool(nameTor, false, "must use Tor network")
+	// flgs.Bool(nameTor, false, "must use Tor network")
 	flgs.StringSliceP(nameSource, "s", nil, "list of sources to get the quotes from")
 	flgs.IntP(nameWorkers, "w", defaultWorkers, "number of workers")
 	flgs.StringSliceP(nameIsin, "i", nil, "list of isins to get the quotes")

@@ -8,26 +8,19 @@ import (
 	"github.com/mmbros/quote/internal/quotegetter"
 )
 
-// InitClient ...
-func InitClient(proxy string) {
-	if proxy == "" {
-		return
-	}
-	quotegetter.Client = quotegetter.DefaultClient(proxy)
-}
-
 // TorCheck checks if a Tor connection is used,
 // retrieving the "https://check.torproject.org" page.
 // It returns:
 //  - bool:   true if Tor is used, false otherwise
 //  - string: the message contained in the html page
 //  - error:  if the message cannot be determined
-func TorCheck() (bool, string, error) {
+func TorCheck(proxy string) (bool, string, error) {
 	// URL to fetch
 	var webURL string = "https://check.torproject.org"
 
+	client := quotegetter.DefaultClient(proxy)
 	// Make request
-	resp, err := quotegetter.Client.Get(webURL)
+	resp, err := client.Get(webURL)
 	if err != nil {
 		return false, "", err
 	}

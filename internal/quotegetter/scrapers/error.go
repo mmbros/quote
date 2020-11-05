@@ -26,6 +26,7 @@ const (
 )
 
 // Error  is ...
+// FIXME use quetegetter.Error
 type Error struct {
 	*ParseInfoResult
 	Type ErrorType

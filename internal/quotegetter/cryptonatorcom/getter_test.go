@@ -3,28 +3,25 @@ package cryptonatorcom
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
-	"net/http"
 	"testing"
-	"time"
 )
 
-func TestGetJson(t *testing.T) {
+// func TestGetJson(t *testing.T) {
 
-	res, err := http.Get("https://api.cryptonator.com/api/ticker/btc-eur")
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	body, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	t.Logf(string(body))
-	// t.Fail()
+// 	res, err := http.Get("https://api.cryptonator.com/api/ticker/btc-eur")
+// 	if err != nil {
+// 		t.Fatalf(err.Error())
+// 	}
+// 	body, err := ioutil.ReadAll(res.Body)
+// 	res.Body.Close()
+// 	if err != nil {
+// 		t.Fatalf(err.Error())
+// 	}
+// 	t.Logf(string(body))
+// 	// t.Fail()
 
-	// {"ticker":{"base":"BTC","target":"EUR","price":"11872.29709977","volume":"9489.21251997","change":"56.52524067"},"timestamp":1604159942,"success":true,"error":""}
-}
+// 	// {"ticker":{"base":"BTC","target":"EUR","price":"11872.29709977","volume":"9489.21251997","change":"56.52524067"},"timestamp":1604159942,"success":true,"error":""}
+// }
 
 func TestParseJson(t *testing.T) {
 	type Ticker struct {
@@ -67,18 +64,11 @@ func TestParseJson(t *testing.T) {
 
 }
 
-func TestUnixTimestamp(t *testing.T) {
-	sec := int64(1604159942)
-
-	tt := time.Unix(sec, 0)
-	t.Log(tt)
-}
-
 func TestGetQuote(t *testing.T) {
-	g := NewQuoteGetter("cryptonator", "EUR")
+	g := NewQuoteGetter("cryptonator-eur", nil, "EUR")
 
 	ctx := context.Background()
-	r, err := g.GetQuote(ctx, "ETH", "")
+	r, err := g.GetQuote(ctx, "BTC", "")
 
 	if err != nil {
 		t.Fatalf(err.Error())
