@@ -11,6 +11,7 @@ quote
 main
 *.db
 *.sqlite?
+*.json
 
 # Test binary, built with `go test -c`
 *.test
