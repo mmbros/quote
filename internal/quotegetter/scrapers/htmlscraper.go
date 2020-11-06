@@ -15,7 +15,7 @@ import (
 
 // Scraper interface
 type Scraper interface {
-	Name() string
+	Source() string
 	Client() *http.Client
 	GetSearch(ctx context.Context, isin string) (*http.Request, error)
 	ParseSearch(doc *goquery.Document, isin string) (string, error)
@@ -62,7 +62,7 @@ func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr Scraper) (*
 	// aux function
 	theError := func(err error, typ ErrorType) (*quotegetter.Result, error) {
 		e := &Error{
-			Name:            scr.Name(),
+			Name:            scr.Source(),
 			Isin:            isin,
 			Type:            typ,
 			Err:             err,
@@ -100,7 +100,7 @@ func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr Scraper) (*
 	}
 
 	r := &quotegetter.Result{
-		Name:     scr.Name(),
+		Source:   scr.Source(),
 		Isin:     isin,
 		URL:      url,
 		Price:    vPrice,
@@ -121,7 +121,7 @@ func getQuote(ctx context.Context, isin, url string, scr Scraper) (*quotegetter.
 	// aux function
 	theError := func(err error, typ ErrorType) (*quotegetter.Result, error) {
 		e := &Error{
-			Name: scr.Name(),
+			Name: scr.Source(),
 			Isin: isin,
 			Type: typ,
 			Err:  err,

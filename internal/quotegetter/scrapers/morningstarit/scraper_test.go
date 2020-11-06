@@ -11,11 +11,11 @@ func getTestScraper() scrapers.Scraper {
 	return &scraper{"morningstarit", nil}
 }
 
-func TestName(t *testing.T) {
+func TestSource(t *testing.T) {
 	const name = "dummy"
 	scr := &scraper{name, nil}
-	if nameFound := scr.Name(); nameFound != name {
-		t.Errorf("Name: found %q, expected %q", nameFound, name)
+	if nameFound := scr.Source(); nameFound != name {
+		t.Errorf("Source: found %q, expected %q", nameFound, name)
 	}
 }
 
@@ -46,10 +46,10 @@ func TestParseSearch(t *testing.T) {
 
 		url, err := scr.ParseSearch(doc, tc.isin)
 		if url != tc.url {
-			t.Errorf("[%s] ParseSearch: URL found %q, expected %q", scr.Name(), url, tc.url)
+			t.Errorf("[%s] ParseSearch: URL found %q, expected %q", scr.Source(), url, tc.url)
 		}
 		if err != tc.err {
-			t.Errorf("[%s] ParseSearch: ERR found %q, expected %q", scr.Name(), err, tc.err)
+			t.Errorf("[%s] ParseSearch: ERR found %q, expected %q", scr.Source(), err, tc.err)
 		}
 	}
 }

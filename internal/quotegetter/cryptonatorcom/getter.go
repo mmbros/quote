@@ -42,7 +42,7 @@ func NewQuoteGetter(name string, client *http.Client, currency string) quotegett
 }
 
 // Name returns the name of the scraper
-func (g *getter) Name() string {
+func (g *getter) Source() string {
 	return g.name
 }
 
@@ -77,10 +77,10 @@ func (g *getter) GetQuote(ctx context.Context, crypto, url string) (*quotegetter
 	r, err := g.parseJSON(body)
 	if err != nil {
 		e := &quotegetter.Error{
-			Isin: crypto,
-			URL:  url,
-			Name: g.Name(),
-			Err:  err,
+			Isin:   crypto,
+			URL:    url,
+			Source: g.Source(),
+			Err:    err,
 		}
 		return nil, e
 	}
@@ -107,7 +107,7 @@ func (g *getter) parseJSON(body []byte) (*quotegetter.Result, error) {
 		r := &quotegetter.Result{
 			Isin:     res.Ticker.Base,
 			Currency: res.Ticker.Target,
-			Name:     g.Name(),
+			Source:   g.Source(),
 			Date:     time.Unix(res.Timestamp, 0),
 			Price:    float32(price64),
 		}

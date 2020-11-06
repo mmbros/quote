@@ -28,11 +28,11 @@ func checkError(t *testing.T, prefix string, found, expected error) bool {
 	return found != nil
 }
 
-func TestName(t *testing.T) {
+func TestSource(t *testing.T) {
 	const expected = "dummy"
 	scr := &scraper{expected, nil}
-	if actual := scr.Name(); actual != expected {
-		t.Errorf("Name: expected %q, found %q", expected, actual)
+	if actual := scr.Source(); actual != expected {
+		t.Errorf("Source: expected %q, found %q", expected, actual)
 	}
 }
 

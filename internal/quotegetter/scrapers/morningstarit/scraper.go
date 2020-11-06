@@ -23,7 +23,7 @@ func NewQuoteGetter(name string, client *http.Client) quotegetter.QuoteGetter {
 }
 
 // Name returns the name of the scraper
-func (s *scraper) Name() string {
+func (s *scraper) Source() string {
 	return s.name
 }
 

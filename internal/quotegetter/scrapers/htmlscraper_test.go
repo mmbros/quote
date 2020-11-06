@@ -78,7 +78,7 @@ var testCasesGetQuote = map[string]*testCaseGetQuote{
 	},
 	"ISIN00000011": {
 		title: "ko-get-info-500",
-		err:   errors.New("GetInfoError: Response status = 500 Internal Server Error"),
+		err:   errors.New("GetInfoError: response status = 500 Internal Server Error"),
 	},
 	"ISIN00000012": {
 		title: "ko-parse-info",
@@ -95,7 +95,7 @@ var testCasesGetQuote = map[string]*testCaseGetQuote{
 }
 
 type testScraper struct {
-	name      string
+	source    string
 	serverURL string
 }
 
@@ -103,8 +103,8 @@ func newTestScraper(name, url string) *testScraper {
 	return &testScraper{name, url}
 }
 
-func (scr testScraper) Name() string {
-	return scr.name
+func (scr testScraper) Source() string {
+	return scr.source
 }
 
 func (scr testScraper) Client() *http.Client {

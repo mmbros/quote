@@ -165,7 +165,7 @@ func Get(items []*SourceIsins, dbpath string) error {
 			}
 			if res != nil {
 				r.Isin = res.Isin
-				r.Source = res.Name
+				r.Source = res.Source
 				r.Price = res.Price
 				r.Currency = res.Currency
 				if !res.Date.IsZero() {
@@ -182,7 +182,7 @@ func Get(items []*SourceIsins, dbpath string) error {
 				}
 				if e, ok := err.(*quotegetter.Error); ok {
 					r.Isin = e.Isin
-					r.Source = e.Name
+					r.Source = e.Source
 					r.URL = e.URL
 				}
 			}
