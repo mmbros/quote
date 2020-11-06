@@ -45,14 +45,14 @@ var testCasesGetQuote = map[string]*testCaseGetQuote{
 		currency: "EUR",
 		date:     time.Date(2020, time.February, 23, 0, 0, 0, 0, time.UTC),
 		// err:      ErrPriceNotFound,
-		errstr: "Price not found",
+		errstr: "price not found",
 	},
 	"ISIN00000004": {
 		title:    "ko-no-date",
 		price:    123,
 		currency: "EUR",
 		// err:      ErrDateNotFound,
-		errstr: "Date not found",
+		errstr: "date not found",
 	},
 	"ISIN00000005": {
 		title: "ko, no-info-result",

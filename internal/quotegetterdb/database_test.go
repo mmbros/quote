@@ -111,6 +111,7 @@ func TestInsertQuotes(t *testing.T) {
 	}
 }
 
+/*
 func TestSelectLastQuotes(t *testing.T) {
 	qdb := mustOpenDB()
 	defer qdb.Close()
@@ -130,6 +131,7 @@ func TestSelectLastQuotes(t *testing.T) {
 	}
 	t.Fail()
 }
+*/
 
 /*
 func TestExtractPath(t *testing.T) {

@@ -32,6 +32,8 @@ func (qr *QuoteRecord) String() string {
 	var buf bytes.Buffer
 
 	buf.WriteString(fmt.Sprintf("{id=%d, isin=%q, source=%q", qr.ID, qr.Isin, qr.Source))
+	buf.WriteString(fmt.Sprintf(", timestamp=%s", qr.Timestamp.UTC()))
+
 	if !qr.Date.IsZero() {
 		buf.WriteString(fmt.Sprintf(", date=%s", qr.Date.Format("2006-01-02")))
 	}
@@ -313,22 +315,24 @@ ORDER BY isin, source, date desc
 }
 */
 
+/*
+
 // SelectLastQuotes is ...
 func (qdb *QuoteDatabase) SelectLastQuotes() ([]*QuoteRecord, error) {
 
-	sqlSelect := `select q.id, q.timestamp, q.isin, q.source, 
+	sqlSelect := `select q.id, q.timestamp, q.isin, q.source,
 q.date, q.price, q.currency, q.url, q.errmsg
-from quotes q 
-where q.id in 
+from quotes q
+where q.id in
 (
-select id 
+select id
 from quotes
 where isin = q.isin
 and source = q.source
 order by timestamp DESC
 limit 2
 )
-order by q.isin, q.source, q.timestamp desc
+order by q.isin, q.timestamp desc, q.source
 `
 	rows, err := qdb.db.Query(sqlSelect)
 	if err != nil {
@@ -369,3 +373,4 @@ order by q.isin, q.source, q.timestamp desc
 	}
 	return result, nil
 }
+*/
