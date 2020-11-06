@@ -13,6 +13,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/mmbros/quote/internal/quotegetter/scrapers/testingscraper"
 	"github.com/mmbros/quote/internal/quotetesting"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testCaseGetQuote struct {
@@ -20,7 +22,8 @@ type testCaseGetQuote struct {
 	price    float32
 	currency string
 	date     time.Time
-	err      error
+	// err      error
+	errstr string
 }
 
 var testCasesGetQuote = map[string]*testCaseGetQuote{
@@ -41,56 +44,68 @@ var testCasesGetQuote = map[string]*testCaseGetQuote{
 		price:    0,
 		currency: "EUR",
 		date:     time.Date(2020, time.February, 23, 0, 0, 0, 0, time.UTC),
-		err:      ErrPriceNotFound,
+		// err:      ErrPriceNotFound,
+		errstr: "Price not found",
 	},
 	"ISIN00000004": {
 		title:    "ko-no-date",
 		price:    123,
 		currency: "EUR",
-		err:      ErrDateNotFound,
+		// err:      ErrDateNotFound,
+		errstr: "Date not found",
 	},
 	"ISIN00000005": {
 		title: "ko, no-info-result",
-		err:   ErrNoResultFound,
+		// err:   ErrNoResultFound,
+		errstr: "no result found",
 	},
 	"ISIN00000006": {
 		title:    "ko, isin-mismatch",
 		price:    12.34,
 		currency: "EUR",
 		date:     time.Date(2020, time.February, 23, 0, 0, 0, 0, time.UTC),
-		err:      ErrIsinMismatch,
+		// err:      ErrIsinMismatch,
+		errstr: "isin mismatch",
 	},
 	"ISIN00000007": {
 		title: "ko, no-info-url",
-		err:   ErrEmptyInfoURL,
+		// err:   ErrEmptyInfoURL,
+		errstr: "empty info URL",
 	},
 	"ISIN00000008": {
 		title: "ko, info-invalid-url",
-		err:   errors.New("ParseSearchError: parse \"/\\nnewline\": net/url: invalid control character in URL"),
+		// err:   errors.New("ParseSearchError: parse \"/\\nnewline\": net/url: invalid control character in URL"),
+		errstr: "ParseSearchError",
 	},
 	"ISIN00000009": {
 		title: "ko, abs-url, info-invalid-url",
-		err:   errors.New("net/url: invalid control character in URL"),
+		// err:   errors.New("net/url: invalid control character in URL"),
+		errstr: "invalid control character in URL",
 	},
 	"ISIN00000010": {
 		title: "ko-get-info-nil",
-		err:   ErrInfoRequestIsNil,
+		// err:   ErrInfoRequestIsNil,
+		errstr: "info request is nil",
 	},
 	"ISIN00000011": {
 		title: "ko-get-info-500",
-		err:   errors.New("GetInfoError: response status = 500 Internal Server Error"),
+		// err:   errors.New("GetInfoError: response status = 500 Internal Server Error"),
+		errstr: "500 Internal Server Error",
 	},
 	"ISIN00000012": {
 		title: "ko-parse-info",
-		err:   ErrNoResultFound,
+		// err:   ErrNoResultFound,
+		errstr: "no result found for isin",
 	},
 	"ISIN00000013": {
 		title: "ko-timeout-get-search",
-		err:   context.DeadlineExceeded,
+		// err:   context.DeadlineExceeded,
+		errstr: "context deadline exceeded",
 	},
 	"ISIN00000014": {
 		title: "ko-timeout-get-info",
-		err:   context.DeadlineExceeded,
+		// err:   context.DeadlineExceeded,
+		errstr: "context deadline exceeded",
 	},
 }
 
@@ -263,17 +278,17 @@ func TestGetQuote(t *testing.T) {
 		res, err := getQuote(ctx, isin, "", scr)
 
 		prefix := fmt.Sprintf("GetQuote[%s]", tc.title)
-		if testingscraper.CheckError(t, prefix, err, tc.err) {
+		// if testingscraper.CheckError(t, prefix, err, tc.err) {
+		// 	continue
+		// }
+		if len(tc.errstr) > 0 {
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.errstr, prefix)
 			continue
 		}
-
-		if res.Currency != tc.currency {
-			t.Errorf("%s: Currency: expected %s, found %s", prefix, tc.currency, res.Currency)
-		}
-		if res.Price != tc.price {
-			t.Errorf("%s: Price: expected %f, found %f", prefix, tc.price, res.Price)
-		}
-
+		assert.NoError(t, err, prefix)
+		assert.Equal(t, tc.currency, res.Currency, "%s: Currency", prefix)
+		assert.Equal(t, tc.price, res.Price, "%s: Price", prefix)
 	}
 
 }
@@ -344,17 +359,15 @@ func TestQuoteGetterGetQuote(t *testing.T) {
 		res, err := qg.GetQuote(ctx, isin, "")
 
 		prefix := fmt.Sprintf("GetQuote[%s]", tc.title)
-		if testingscraper.CheckError(t, prefix, err, tc.err) {
+
+		if len(tc.errstr) > 0 {
+			require.Error(t, err)
+			require.Contains(t, err.Error(), tc.errstr, prefix)
 			continue
 		}
-
-		if res.Currency != tc.currency {
-			t.Errorf("%s: Currency: expected %s, found %s", prefix, tc.currency, res.Currency)
-		}
-		if res.Price != tc.price {
-			t.Errorf("%s: Price: expected %f, found %f", prefix, tc.price, res.Price)
-		}
-
+		assert.NoError(t, err, prefix)
+		assert.Equal(t, tc.currency, res.Currency, "%s: Currency", prefix)
+		assert.Equal(t, tc.price, res.Price, "%s: Price", prefix)
 	}
 
 }

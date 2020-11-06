@@ -1,13 +1,15 @@
 package cmd
 
 import (
-	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/spf13/viper"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var allSources1 = []string{"source1", "source2", "source3", "sourceX"}
@@ -55,58 +57,6 @@ isins:
 // 	_, ok := s[key]
 // 	return ok
 // }
-
-func messageFromMsgAndArgs(msgAndArgs ...interface{}) string {
-	if len(msgAndArgs) == 0 || msgAndArgs == nil {
-		return ""
-	}
-	if len(msgAndArgs) == 1 {
-		msg := msgAndArgs[0]
-		if msgAsStr, ok := msg.(string); ok {
-			return msgAsStr
-		}
-		return fmt.Sprintf("%+v", msg)
-	}
-	if len(msgAndArgs) > 1 {
-		return fmt.Sprintf(msgAndArgs[0].(string), msgAndArgs[1:]...)
-	}
-	return ""
-}
-func assertEqualString(t *testing.T, want, got string, msgAndArgs ...interface{}) {
-	if got != want {
-		msg := messageFromMsgAndArgs(msgAndArgs...)
-		t.Errorf("%s: want %q, got %q", msg, want, got)
-	}
-}
-
-func assertEqualInt(t *testing.T, want, got int, msgAndArgs ...interface{}) {
-	if got != want {
-		msg := messageFromMsgAndArgs(msgAndArgs...)
-		t.Errorf("%s: want %d, got %d", msg, want, got)
-	}
-}
-
-func assertEqualBool(t *testing.T, want, got bool, msgAndArgs ...interface{}) {
-	if got != want {
-		msg := messageFromMsgAndArgs(msgAndArgs...)
-		t.Errorf("%s: want %v, got %v", msg, want, got)
-	}
-}
-
-func assertError(t *testing.T, err error, substr string, msgAndArgs ...interface{}) {
-	if len(substr) == 0 {
-		if err == nil {
-			msg := messageFromMsgAndArgs(msgAndArgs...)
-			t.Errorf("%s: expected error", msg)
-		}
-		return
-	}
-
-	if err == nil || strings.Index(err.Error(), substr) < 0 {
-		msg := messageFromMsgAndArgs(msgAndArgs...)
-		t.Errorf("%s: expected error with substr %q, got: %q", msg, substr, err)
-	}
-}
 
 func initViperConfig(config string) {
 	viper.SetConfigType("yaml")
@@ -156,15 +106,13 @@ func TestParseArgSource(t *testing.T) {
 	for _, tc := range testCases {
 		s, w, err := parseArgSource(tc.input, ":/#")
 		if tc.err {
-			assertError(t, err, "invalid source in args", tc.input)
-		}
-		if !tc.err {
-			if err != nil {
-				t.Errorf("Unxpected error for input %q: %v", tc.input, err)
-			} else {
-				// no error
-				assertEqualString(t, tc.source, s, "input %q: source", tc.input)
-				assertEqualInt(t, tc.workers, w, "input %q: workers", tc.input)
+			if assert.Error(t, err, "input %q", tc.input) {
+				assert.Contains(t, err.Error(), "invalid source in args", tc.input)
+			}
+		} else {
+			if assert.NoError(t, err, "input %q", tc.input) {
+				assert.Equal(t, tc.source, s, "input %q: source", tc.input)
+				assert.Equal(t, tc.workers, w, "input %q: workers", tc.input)
 			}
 		}
 	}
@@ -182,13 +130,14 @@ func TestFullNotValidatedConfig(t *testing.T) {
 	}
 
 	cfg, err := getFullNotValidatedConfig(args, allSources1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err, "getFullNotValidatedConfig")
 
 	if args.Sources == nil {
-		s := cfg.Sources["sourceX"] // in all sources but not in config
-		assertEqualBool(t, false, s.Disabled, "source[%q].disabled", s.Source)
+		sourceName := "sourceX" // in all sources but not in config
+		s := cfg.Sources[sourceName]
+		if assert.True(t, s != nil, "source[%q] not found", sourceName) {
+			assert.True(t, !s.Disabled, "source[%q].disabled", sourceName)
+		}
 	} else {
 		swmap := map[string]int{}
 		for _, sw := range args.Sources {
@@ -197,34 +146,34 @@ func TestFullNotValidatedConfig(t *testing.T) {
 		}
 
 		// check all args sources are found in cfg sources
-		// check also the soruce.workers
+		// check also the source.workers value
 		for s, w := range swmap {
-			if source, ok := cfg.Sources[s]; !ok {
-				t.Errorf("args source %q not found in cfg", s)
-			} else if w != 0 {
-				assertEqualInt(t, w, source.Workers, "source[%q].workers", source.Source)
+			source, ok := cfg.Sources[s]
+			if assert.True(t, ok, "args source %q not found in cfg", s) {
+				if w != 0 {
+					assert.Equal(t, w, source.Workers, "source[%q].workers", source.Source)
+				}
 			}
 		}
 
 		// check only sources in args are enabled
 		for _, s := range cfg.Sources {
 			_, ok := swmap[s.Source]
-			assertEqualBool(t, !ok, s.Disabled, "source[%q].disabled", s.Source)
+			assert.Equal(t, !ok, s.Disabled, "source[%q].disabled", s.Source)
 		}
 	}
 
 	if args.Isins != nil {
 		// check all args isins are found in cfg isins
 		for _, i := range args.Isins {
-			if _, ok := cfg.Isins[i]; !ok {
-				t.Errorf("args isin %q not found in cfg", i)
-			}
+			_, ok := cfg.Isins[i]
+			assert.True(t, ok, "args isin %q not found in cfg", i)
 		}
 		// check only isins in args are enabled
 		isinsArgsSet := newSet(args.Isins)
 		for _, i := range cfg.Isins {
 			ok := isinsArgsSet.has(i.Isin)
-			assertEqualBool(t, !ok, i.Disabled, "isin[%q].disabled", i.Isin)
+			assert.Equal(t, !ok, i.Disabled, "isin[%q].disabled", i.Isin)
 		}
 	}
 
@@ -294,14 +243,11 @@ func TestArgsProxy(t *testing.T) {
 			Sources:     allSources1,
 		}
 		cfg, err := getConfig(args, allSources1)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		assertEqualString(t, tc.want1, cfg.Sources["source1"].Proxy, "%s: source1.proxy", tc.title)
-		assertEqualString(t, tc.want2, cfg.Sources["source2"].Proxy, "%s: source1.proxy", tc.title)
-		assertEqualString(t, tc.want3, cfg.Sources["source3"].Proxy, "%s: source3.proxy", tc.title)
-		assertEqualString(t, tc.wantX, cfg.Sources["sourceX"].Proxy, "%s: sourceX.proxy", tc.title)
+		require.NoError(t, err, "getConfig")
+		assert.Equal(t, tc.want1, cfg.Sources["source1"].Proxy, "%s: source1.proxy", tc.title)
+		assert.Equal(t, tc.want2, cfg.Sources["source2"].Proxy, "%s: source1.proxy", tc.title)
+		assert.Equal(t, tc.want3, cfg.Sources["source3"].Proxy, "%s: source3.proxy", tc.title)
+		assert.Equal(t, tc.wantX, cfg.Sources["sourceX"].Proxy, "%s: sourceX.proxy", tc.title)
 	}
 
 }
@@ -345,14 +291,11 @@ func TestArgsWorkers(t *testing.T) {
 		}
 
 		cfg, err := getConfig(args, allSources1)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		assertEqualInt(t, tc.want1, cfg.Sources["source1"].Workers, "%s: source1.workers", tc.title)
-		assertEqualInt(t, tc.want2, cfg.Sources["source2"].Workers, "%s: source1.workers", tc.title)
-		assertEqualInt(t, tc.want3, cfg.Sources["source3"].Workers, "%s: source3.workers", tc.title)
-		assertEqualInt(t, tc.wantX, cfg.Sources["sourceX"].Workers, "%s: sourceX.workers", tc.title)
+		require.NoError(t, err, "getConfig")
+		assert.Equal(t, tc.want1, cfg.Sources["source1"].Workers, "%s: source1.workers", tc.title)
+		assert.Equal(t, tc.want2, cfg.Sources["source2"].Workers, "%s: source1.workers", tc.title)
+		assert.Equal(t, tc.want3, cfg.Sources["source3"].Workers, "%s: source3.workers", tc.title)
+		assert.Equal(t, tc.wantX, cfg.Sources["sourceX"].Workers, "%s: sourceX.workers", tc.title)
 	}
 
 }
@@ -369,7 +312,9 @@ func TestWorkersError(t *testing.T) {
 		Sources:       allSources1,
 	}
 	cfg, err := getConfig(args, allSources1)
-	assertError(t, err, "workers must be greater than zero", "args.workers")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "workers must be greater than zero", "args.workers")
+	}
 
 	//
 	// cfg.workers = -1
@@ -380,7 +325,9 @@ func TestWorkersError(t *testing.T) {
 	}
 	initViperConfig("workers: -1")
 	cfg, err = getConfig(args, allSources1)
-	assertError(t, err, "workers must be greater than zero", "cfg.workers")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "workers must be greater than zero", "cfg.workers")
+	}
 
 	//
 	// cfg.workers = 0
@@ -393,10 +340,9 @@ func TestWorkersError(t *testing.T) {
 	cfg, err = getConfig(args, allSources1)
 
 	name := "source1"
-	if cfg.Sources[name] == nil {
-		t.Fatalf("source %q not found!", name)
+	if assert.True(t, cfg.Sources[name] != nil, "source %q not found!", name) {
+		assert.Equal(t, defaultWorkers, cfg.Sources[name].Workers, "source[%q].workers", name)
 	}
-	assertEqualInt(t, defaultWorkers, cfg.Sources[name].Workers, "source[%q].workers", name)
 }
 
 func TestDefaults(t *testing.T) {
@@ -420,8 +366,8 @@ func TestDefaults(t *testing.T) {
 	if cfg.Sources[name] == nil {
 		t.Fatalf("source %q not found!", name)
 	}
-	assertEqualInt(t, defaultWorkers, cfg.Sources[name].Workers, "source[%q].workers", name)
-	assertEqualString(t, cfg.Sources[name].Proxy, "", "source[%q].proxy", name)
+	assert.Equal(t, defaultWorkers, cfg.Sources[name].Workers, "source[%q].workers", name)
+	assert.Equal(t, cfg.Sources[name].Proxy, "", "source[%q].proxy", name)
 }
 
 func TestSourcesFilter(t *testing.T) {
@@ -436,10 +382,10 @@ isins:
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	assertEqualInt(t, 2, len(cfg.Sources), "len(cfg.Sources)")
+	assert.Equal(t, 2, len(cfg.Sources), "len(cfg.Sources)")
 	for _, s := range []string{"source1", "source2"} {
 		_, ok := cfg.Sources[s]
-		assertEqualBool(t, true, ok, s)
+		assert.Equal(t, true, ok, s)
 	}
 }
 
@@ -451,7 +397,9 @@ isins:
   sources: [source1, sourceZ]
 `)
 	cfg, err := getConfig(nil, allSources1)
-	assertError(t, err, "required source", "unknown source in config")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "required source", "unknown source in config")
+	}
 
 	// 2. unknown source in args
 	args := &cmdGetArgs{
@@ -460,9 +408,8 @@ isins:
 	}
 	initViperConfig("")
 	cfg, err = getConfig(args, allSources1)
-	assertError(t, err, "required source", "unknown source in args")
-	if t.Failed() {
-		t.Log(cfg)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "required source", "unknown source in args")
 	}
 
 	if t.Failed() {
@@ -480,10 +427,9 @@ sources:
 - source: source1
   disabled: y
 `)
-	cfg, err := getConfig(nil, allSources1)
-	assertError(t, err, "without enabled sources", "isin1")
-	if t.Failed() {
-		t.Log(cfg)
+	_, err := getConfig(nil, allSources1)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "without enabled sources", "unknown source in args")
 	}
 }
 
@@ -499,10 +445,10 @@ sources:
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
-	assertEqualInt(t, 3, len(cfg.Sources), "len(cfg.Sources)")
+	assert.Equal(t, 3, len(cfg.Sources), "len(cfg.Sources)")
 	for _, s := range []string{"source2", "source3", "sourceX"} {
 		_, ok := cfg.Sources[s]
-		assertEqualBool(t, true, ok, s)
+		assert.Equal(t, true, ok, s)
 	}
 }
 
@@ -515,7 +461,9 @@ sources:
   workers: -1
 `)
 	_, err := getConfig(nil, allSources1)
-	assertError(t, err, "workers must be greater than zero", "source1")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "workers must be greater than zero", "source1")
+	}
 }
 
 func TestSourceProxy(t *testing.T) {
@@ -526,10 +474,9 @@ sources:
 - source: source1
   proxy: ::xxx
 `)
-	cfg, err := getConfig(nil, allSources1)
-	assertError(t, err, "invalid proxy", "source1")
-	if t.Failed() {
-		t.Log(cfg)
+	_, err := getConfig(nil, allSources1)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "invalid proxy", "source1")
 	}
 }
 
@@ -540,10 +487,9 @@ isins:
 proxies:
 - url: htps://proxy
 `)
-	cfg, err := getConfig(nil, allSources1)
-	assertError(t, err, "Invalid proxies: missing \"proxy\" key", "proxy")
-	if t.Failed() {
-		t.Log(cfg)
+	_, err := getConfig(nil, allSources1)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "Invalid proxies: missing \"proxy\" key", "proxy")
 	}
 }
 func TestKeyIsin(t *testing.T) {
@@ -551,10 +497,9 @@ func TestKeyIsin(t *testing.T) {
 isins:
 - sources: ["source1"]
 `)
-	cfg, err := getConfig(nil, allSources1)
-	assertError(t, err, "Invalid isins: missing \"isin\" key", "isin")
-	if t.Failed() {
-		t.Log(cfg)
+	_, err := getConfig(nil, allSources1)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "Invalid isins: missing \"isin\" key", "isin")
 	}
 }
 func TestKeySource(t *testing.T) {
@@ -562,14 +507,13 @@ func TestKeySource(t *testing.T) {
 sources:
 - proxy: https://proxy
 `)
-	cfg, err := getConfig(nil, allSources1)
-	assertError(t, err, "Invalid sources: missing \"source\" key", "source")
-	if t.Failed() {
-		t.Log(cfg)
+	_, err := getConfig(nil, allSources1)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "Invalid sources: missing \"source\" key", "source")
 	}
 }
 
-func TestArgsDatabaase(t *testing.T) {
+func TestArgsDatabase(t *testing.T) {
 	db := "/home/user/config.toml"
 	args := &cmdGetArgs{
 		Database:       db,
@@ -579,20 +523,9 @@ func TestArgsDatabaase(t *testing.T) {
 	}
 	initViperConfig("")
 	cfg, err := getConfig(args, allSources1)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
+	if assert.NoError(t, err) {
+		assert.Equal(t, db, cfg.Database, "database")
 	}
-	assertEqualString(t, db, cfg.Database, "database")
-}
-
-func TestString(t *testing.T) {
-	initViperConfig(yamlConfig1)
-	cfg, err := getConfig(nil, allSources1)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	t.Log(cfg)
-	// t.Fail()
 }
 
 func TestArgsInvalidSource(t *testing.T) {
@@ -601,7 +534,9 @@ func TestArgsInvalidSource(t *testing.T) {
 		Sources: []string{"source:nan"},
 	}
 	_, err := getConfig(args, allSources1)
-	assertError(t, err, "invalid source in args")
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "invalid source in args")
+	}
 }
 
 func TestIsinSources(t *testing.T) {
@@ -693,7 +628,5 @@ sources:
 		if t.Failed() {
 			t.Log(cfg)
 		}
-
 	}
-
 }
