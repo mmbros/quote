@@ -2,6 +2,7 @@ package quotegetter
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -24,12 +25,46 @@ type Result struct {
 	Date     time.Time
 }
 
-// Error is
-type Error struct {
-	Source string
-	Isin   string
-	URL    string
-	Err    error
+// Error is the interface that must be matched by all quotegetter errors
+type Error interface {
+	Source() string
+	Isin() string
+	URL() string
+	Error() string
+	Unwrap() error
+}
+
+// getterError is a base implementation of quotegetter.Error interface
+type getterError struct {
+	source string
+	isin   string
+	url    string
+	err    error
+}
+
+// NewError creates a new *jsonGetterError
+func NewError(source, isin, url string, err error) error {
+	return &getterError{source, isin, url, err}
+}
+
+// Source returns the Source of the error
+func (e *getterError) Source() string { return e.source }
+
+// Isin returns the Isin of the error
+func (e *getterError) Isin() string { return e.isin }
+
+// URL returns the URL of the error
+func (e *getterError) URL() string { return e.url }
+
+// Unwrap returns the inner error
+func (e *getterError) Unwrap() error { return e.err }
+
+// Error return the string representation of the error
+func (e *getterError) Error() string {
+	if e.err == nil {
+		return fmt.Sprintf("Unknown error getting quote of isin %q from source %q", e.isin, e.source)
+	}
+	return e.err.Error()
 }
 
 // NormalizeCurrency return the standard ISO4217 representation
@@ -39,8 +74,4 @@ func NormalizeCurrency(currency string) string {
 		return "EUR"
 	}
 	return currency
-}
-
-func (e *Error) Error() string {
-	return e.Err.Error()
 }

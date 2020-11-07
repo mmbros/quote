@@ -62,12 +62,12 @@ func getInfoFromDoc(docInfo *goquery.Document, isin, url string, scr Scraper) (*
 	// aux function
 	theError := func(err error, typ ErrorType) (*quotegetter.Result, error) {
 		e := &Error{
-			Name:            scr.Source(),
-			Isin:            isin,
-			Type:            typ,
-			Err:             err,
-			URL:             url,
 			ParseInfoResult: pir,
+			source:          scr.Source(),
+			isin:            isin,
+			url:             url,
+			err:             err,
+			errType:         typ,
 		}
 		return nil, e
 	}
@@ -121,11 +121,11 @@ func getQuote(ctx context.Context, isin, url string, scr Scraper) (*quotegetter.
 	// aux function
 	theError := func(err error, typ ErrorType) (*quotegetter.Result, error) {
 		e := &Error{
-			Name: scr.Source(),
-			Isin: isin,
-			Type: typ,
-			Err:  err,
-			URL:  url,
+			source:  scr.Source(),
+			isin:    isin,
+			url:     url,
+			err:     err,
+			errType: typ,
 		}
 		return nil, e
 	}

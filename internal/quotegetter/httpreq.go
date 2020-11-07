@@ -35,7 +35,7 @@ func DoHTTPRequest(client *http.Client, req *http.Request) (*http.Response, erro
 	}
 	resp, err := client.Do(req)
 	if (err == nil) && (resp.StatusCode != http.StatusOK) {
-		err = fmt.Errorf("%s %q with response status = %v", req.Method, req.URL, resp.Status)
+		err = fmt.Errorf("%s response status = %v", req.Method, resp.Status)
 	}
 	return resp, err
 }

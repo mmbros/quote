@@ -53,40 +53,47 @@ func (g *getter) Client() *http.Client {
 
 // GetQuote ....
 func (g *getter) GetQuote(ctx context.Context, crypto, url string) (*quotegetter.Result, error) {
+	var (
+		res  *http.Response
+		body []byte
+		r    *quotegetter.Result
+	)
 
+	// url
 	if url == "" {
 		url = fmt.Sprintf("https://api.cryptonator.com/api/ticker/%s-%s",
 			strings.ToLower(crypto),
 			strings.ToLower(g.currency))
 	}
 
+	// http.Request
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 
-	res, err := quotegetter.DoHTTPRequest(g.client, req)
-	if err != nil {
-		return nil, err
+	// http.Response
+	if err == nil {
+		res, err = quotegetter.DoHTTPRequest(g.client, req)
 	}
 
-	// body, err := ioutil.ReadAll(res.Body)
-	body, err := ioutil.ReadAll(res.Body)
-	res.Body.Close()
-	if err != nil {
-		return nil, err
+	// read body of http.Response
+	if err == nil {
+		body, err = ioutil.ReadAll(res.Body)
+		res.Body.Close()
 	}
 
-	r, err := g.parseJSON(body)
-	if err != nil {
-		e := &quotegetter.Error{
-			Isin:   crypto,
-			URL:    url,
-			Source: g.Source(),
-			Err:    err,
-		}
-		return nil, e
+	// parse json to get the result
+	if err == nil {
+		r, err = g.parseJSON(body)
 	}
-	r.URL = url
 
-	return r, nil
+	// success
+	if err == nil {
+		r.URL = url
+		return r, nil
+	}
+
+	// error
+	e := quotegetter.NewError(g.Source(), crypto, url, err)
+	return nil, e
 }
 
 func (g *getter) parseJSON(body []byte) (*quotegetter.Result, error) {

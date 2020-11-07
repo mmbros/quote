@@ -174,16 +174,10 @@ func Get(items []*SourceIsins, dbpath string) error {
 			}
 			if err != nil {
 				r.ErrMsg = err.Error()
-				// FIXME
-				if e, ok := err.(*scrapers.Error); ok {
-					r.Isin = e.Isin
-					r.Source = e.Name
-					r.URL = e.URL
-				}
-				if e, ok := err.(*quotegetter.Error); ok {
-					r.Isin = e.Isin
-					r.Source = e.Source
-					r.URL = e.URL
+				if e, ok := err.(quotegetter.Error); ok {
+					r.Isin = e.Isin()
+					r.Source = e.Source()
+					r.URL = e.URL()
 				}
 			}
 			return r
