@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/mmbros/quote/internal/quotegetter"
-	"github.com/mmbros/quote/internal/quotegetter/cryptonatorcom"
+	"github.com/mmbros/quote/internal/quotegetter/jsons/cryptonatorcom"
 	"github.com/mmbros/quote/internal/quotegetter/scrapers/fondidocit"
 	"github.com/mmbros/quote/internal/quotegetter/scrapers/fundsquarenet"
 	"github.com/mmbros/quote/internal/quotegetter/scrapers/morningstarit"
