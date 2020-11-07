@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestNames(t *testing.T) {
+func TestSources(t *testing.T) {
 	// check the strings are alphabetically sorted
 	names := Sources()
 	for j := 1; j < len(names); j++ {

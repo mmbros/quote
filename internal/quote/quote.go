@@ -133,9 +133,32 @@ func checkListOfSourceIsins(items []*SourceIsins) error {
 // Get is ...
 func Get(items []*SourceIsins, dbpath string) error {
 
+	results, err := getResults(items, taskengine.FirstSuccessOrLastError)
+	if err != nil {
+		return err
+	}
+
+	// save to database, if not empty
+	err = dbInsert(dbpath, results)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	json, err := json.MarshalIndent(results, "", " ")
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(string(json))
+
+	return nil
+}
+
+func getResults(items []*SourceIsins, mode taskengine.Mode) ([]*resultGetQuote, error) {
+
 	// check input
 	if err := checkListOfSourceIsins(items); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Workers
@@ -168,6 +191,7 @@ func Get(items []*SourceIsins, dbpath string) error {
 				r.Source = res.Source
 				r.Price = res.Price
 				r.Currency = res.Currency
+				r.URL = res.URL
 				if !res.Date.IsZero() {
 					r.Date = &res.Date
 				}
@@ -197,7 +221,6 @@ func Get(items []*SourceIsins, dbpath string) error {
 			ts = append(ts, &taskGetQuote{
 				isin: isin,
 				url:  "",
-				// proxy: item.Proxy,
 			})
 		}
 		wts[w.WorkerID] = ts
@@ -206,9 +229,9 @@ func Get(items []*SourceIsins, dbpath string) error {
 
 	wts.SortTasks()
 
-	resChan, err := taskengine.Execute(context.Background(), ws, wts, taskengine.FirstSuccessThenCancel)
+	resChan, err := taskengine.Execute(context.Background(), ws, wts, mode)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	results := []*resultGetQuote{}
@@ -217,18 +240,5 @@ func Get(items []*SourceIsins, dbpath string) error {
 		results = append(results, res)
 	}
 
-	// save to database, if not empty
-	err = dbInsert(dbpath, results)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	json, err := json.MarshalIndent(results, "", " ")
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(string(json))
-
-	return nil
+	return results, nil
 }
