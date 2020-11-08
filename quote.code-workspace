@@ -8,6 +8,7 @@
 	"launch": {
 		"version": "0.2.0",
 		"configurations": [		
+
 		{
 			"name": "Launch file",
 			"type": "go",
@@ -55,9 +56,8 @@
 				"request": "launch",
 				"mode": "auto",
 				"program": "${workspaceFolder}/main.go",
-				"env": {"HTTPS_PROXY": "socks5://127.0.0.1:9050"},
-				"args": ["get", "--config", "test.config.yaml",  
-					"--dry-run"]
+				"env": {},
+				"args": ["get", "-n"]
 			},		
 			{
 				"name": "CMD Get LU0000000001",

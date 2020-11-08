@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -528,6 +529,16 @@ func TestArgsDatabase(t *testing.T) {
 	}
 }
 
+func TestConfigDatabase(t *testing.T) {
+
+	db := "/home/user/quote.sqlite3"
+	config := fmt.Sprintf("database: %s\nisins:\n- isin: isin1", db)
+	initViperConfig(config)
+	cfg, err := getConfig(nil, allSources1)
+	if assert.NoError(t, err) {
+		assert.Equal(t, db, cfg.Database, "database")
+	}
+}
 func TestArgsInvalidSource(t *testing.T) {
 	initViperConfig(yamlConfig1)
 	args := &cmdGetArgs{

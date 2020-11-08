@@ -48,13 +48,15 @@ See 'quote sources' for a list of the available sources.
 		a.Isins, _ = fgs.GetStringSlice(nameIsin)
 		a.Sources, _ = fgs.GetStringSlice(nameSource)
 
-		sis, err := getSourceIsinsList(a, quote.Sources())
+		cfg, err := getConfig(a, quote.Sources())
+		sis := cfg.getSourceIsinsList()
 
 		if a.DryRun {
-			fmt.Printf("%v\n", a)
+			fmt.Printf("ARGS: %v\n", a)
 
 			configFile := viper.GetViper().ConfigFileUsed()
 			fmt.Printf("Using configuration file %q\n", configFile)
+			fmt.Printf("Database: %q\n", cfg.Database)
 
 			fmt.Println(jsonString(sis))
 
@@ -67,7 +69,7 @@ See 'quote sources' for a list of the available sources.
 
 		// do retrieves the quotes
 		if err == nil {
-			err = quote.Get(sis, a.Database)
+			err = quote.Get(sis, cfg.Database)
 		}
 		return err
 	},

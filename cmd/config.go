@@ -475,6 +475,37 @@ func getConfig(args *cmdGetArgs, allSources []string) (*Config, error) {
 
 	return cfg, nil
 }
+func (cfg *Config) getSourceIsinsList() []*quote.SourceIsins {
+	if cfg == nil {
+		return nil
+	}
+	// build a map from source to isins
+	m := map[string][]string{}
+	for _, i := range cfg.Isins {
+		for _, s := range i.Sources {
+			a := m[s]
+			if a == nil {
+				a = []string{i.Isin}
+			} else {
+				a = append(a, i.Isin)
+			}
+			m[s] = a
+		}
+	}
+
+	sis := make([]*quote.SourceIsins, 0, len(cfg.Sources))
+	for _, src := range cfg.Sources {
+		si := &quote.SourceIsins{
+			Source:  src.Source,
+			Proxy:   src.Proxy,
+			Workers: src.Workers,
+			Isins:   m[src.Source],
+		}
+		sis = append(sis, si)
+	}
+	return sis
+
+}
 
 func getSourceIsinsList(args *cmdGetArgs, allSources []string) ([]*quote.SourceIsins, error) {
 	cfg, err := getFullNotValidatedConfig(args, allSources)
