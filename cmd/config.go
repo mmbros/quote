@@ -221,6 +221,11 @@ func (cfg *Config) mergeArgs(args *cmdGetArgs) error {
 	if args.PassedProxy {
 		cfg.Proxy = args.Proxy
 	}
+	// if proxy string corresponds to a key in the proxy map,
+	// change the key with the corresponding value
+	if p, ok := cfg.Proxies[cfg.Proxy]; ok {
+		cfg.Proxy = p
+	}
 
 	// database
 	if args.PassedDatabase {

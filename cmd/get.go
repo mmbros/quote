@@ -93,7 +93,7 @@ func init() {
 	flgs := getCmd.Flags()
 
 	flgs.BoolP(nameDryRun, "n", false, "perform a trial run with no request/updates made")
-	// flgs.Bool(nameTor, false, "must use Tor network")
+	flgs.StringP(nameProxy, "p", "", "deault proxy")
 	flgs.StringSliceP(nameSource, "s", nil, "list of sources to get the quotes from")
 	flgs.IntP(nameWorkers, "w", defaultWorkers, "number of workers")
 	flgs.StringSliceP(nameIsin, "i", nil, "list of isins to get the quotes")
@@ -102,6 +102,6 @@ func init() {
 	// commented because MarkFlagRequired doesn't check config file
 	// cobra.MarkFlagRequired(flgs, nameIsin)
 
-	// XXX commented
+	// commented
 	// viper.BindPFlags(flgs)
 }

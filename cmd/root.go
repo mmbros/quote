@@ -46,7 +46,7 @@ func init() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.quote.yaml)")
 	rootCmd.PersistentFlags().String("database", "", "quote sqlite3 database")
-	rootCmd.PersistentFlags().String("proxy", "", "default proxy")
+	// rootCmd.PersistentFlags().String("proxy", "", "default proxy")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
