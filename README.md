@@ -1,12 +1,14 @@
 # quote
 Get stock/fund quotes from various sources.
 
+[![Build Status](https://travis-ci.com/mmbros/quote.svg?branch=main)](https://travis-ci.com/mmbros/quote)
 
 `quote` is a command line utility that retrieves stock/fund quotes from
 various sources.
 
 The stock/fund securities are identified by their International Securities
 Identification Number (ISIN). 
+Cryptocurrency are identified by their currency code.
 
 Each quote request is retrieved concurrently from all the sources available
 for that stock/fund. For each isin, the first success request is returned,
@@ -100,39 +102,41 @@ The quote configuration file can be written in `toml`, `yaml` or `json` format.
 
 ### `config`
 
-|param|type|description|
-|-|-|-|
+|param   |type  |description|
+|--------|------|-|
 |database|string|path of the sqlite3 database where the quotes are saved. If setted, the database is created if not exists.|
-|workers|int|Default number of workers. Used if param `workers` is missing for sources without specific `workers` value.|
-|proxy|string|Default proxy. Used if param `proxy` is missing for sources without specific `proxy` value.|
-|proxies|array|List of proxies to be used. See below for proxy fields.|
-|isins|array|List of isins to be retrieved. See below for isin fields.|
-|sources|array|List of sources. See below for source fields.|
+|workers |int   |Default number of workers. Used if param `workers` is missing for sources without specific `workers` value.|
+|proxy   |string|Default proxy. Used if param `proxy` is missing for sources without specific `proxy` value.|
+|proxies |array |List of proxies to be used. See below for proxy fields.|
+|isins   |array |List of isins to be retrieved. See below for isin fields.|
+|sources |array |List of sources. See below for source fields.|
 
 ### `proxies`
 List of proxies to be used.
 
-|param|type|description|
-|-|-|-|
-|proxy|string|Mandatory name of the proxy.| 
-|url|string|URL of the proxy.|
+|param   |type  |description|
+|--------|------|-|
+|proxy   |string|Mandatory name of the proxy.| 
+|url     |string|URL of the proxy.|
 
 ### `isins`
 List of isins to be retrieved.
 
-|param|type|description|
-|-|-|-|
-|isin|string|Mandatory ID of the fund/stock.| 
-|name|string|Name of the fund/stock. Only for documentation porpouses; it's not used in the retrieval of the quote.|
-|sources|array|List of the sources to be used to get the quote of the isin. If missing, all the (enabled) available sources are used.|
-|disabled|bool|If disabled, the isin is not retrieved.|
-
+|param   |type  |description|
+|--------|------|-|
+|isin    |string|Mandatory ID of the fund/stock.| 
+|name    |string|Name of the fund/stock. Only for documentation porpouses; it's not used in the retrieval of the quote.|
+|sources |array |List of the sources to be used to get the quote of the isin. If missing, all the (enabled) available sources are used.|
+|disabled|bool  |If disabled, the isin is not retrieved.|
 
 
 In case `--isin` argument is setted in the command line: 
 
-- only the isins passed in the command line are retrieved, even if they don't exists or are disabled in the config file;
-- if the `sources` param is setted in the config file for an isin passed as an argument, those sources are used (if not disabled) to retrieve the quote, even if the isin is disabled in the config file.
+- only the isins passed in the command line are retrieved, 
+  even if they don't exists or are disabled in the config file;
+- if the `sources` param is setted in the config file for an isin passed as an argument,
+  only those sources are used (if not disabled) to retrieve the quote,
+  even if the isin is disabled in the config file.
 
 
 ### `sources`
@@ -142,16 +146,17 @@ The complete list of available sources can be getted with `quote sources`.
  
  Each source configuration section can have the following fields:
 
-|param|type|description|
-|-|-|-|
-|source|string|Mandatory name of the source.| 
-|workers|int|Number of workers.|
-|proxy|string|Proxy url or proxy name to be used.|
-|disabled|bool|If disabled, the source is not used.|
+|param   |type  |description|
+|--------|------|-|
+|source  |string|Mandatory name of the source.| 
+|workers |int   |Number of workers.|
+|proxy   |string|Proxy url or proxy name to be used.|
+|disabled|bool  |If disabled, the source is not used.|
 
 In case `--source` argument is passed in the command line: 
 
-- only the sources passed in the command line are used, even if they don't exists or are disabled in the config file;
+- only the sources passed in the command line are used,
+  even if they don't exists or are disabled in the config file;
 
 
 ### Example
@@ -174,19 +179,19 @@ Configuration file in `yaml` format.
         sources: [crypto1]
     
       - isin: ETH
-        name: Bitcoin
+        name: Ethereum
         sources: [crypto1]
     
       - isin: LU0000000001
-        name: name1
+        name: Global Fund USD 2020
         sources: [source1, source2, source3]
     
-      - isin: IT0000000002
-        name: name2
+      - isin: LU0000000002
+        name: China Dynamic Fund Acc EUR 
         sources: [source1, source2, source3]
     
       - isin: EU0000000003
-        name: name3
+        name: Growth Europe EUR III
         sources: [source1, source2, source3]
         disabled: true
     
