@@ -8,7 +8,7 @@ various sources.
 
 The stock/fund securities are identified by their International Securities
 Identification Number (ISIN). 
-Cryptocurrency are identified by their currency code.
+Cryptocurrencies are identified by their currency code.
 
 Each quote request is retrieved concurrently from all the sources available
 for that stock/fund. For each isin, the first success request is returned,
