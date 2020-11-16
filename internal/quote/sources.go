@@ -33,7 +33,7 @@ func init() {
 
 }
 
-func initQuoteGetters(src []*SourceIsins) map[string]quotegetter.QuoteGetter {
+func initQuoteGetters(src []*SourceIsins) (map[string]quotegetter.QuoteGetter, error) {
 	quoteGetter := make(map[string]quotegetter.QuoteGetter)
 
 	proxyClient := map[string]*http.Client{}
@@ -43,7 +43,10 @@ func initQuoteGetters(src []*SourceIsins) map[string]quotegetter.QuoteGetter {
 
 		client, ok := proxyClient[s.Proxy]
 		if !ok {
-			client := quotegetter.DefaultClient(s.Proxy)
+			client, err := quotegetter.DefaultClient(s.Proxy)
+			if err != nil {
+				return nil, err
+			}
 			proxyClient[s.Proxy] = client
 		}
 
@@ -54,7 +57,7 @@ func initQuoteGetters(src []*SourceIsins) map[string]quotegetter.QuoteGetter {
 		quoteGetter[name] = fn(name, client)
 	}
 
-	return quoteGetter
+	return quoteGetter, nil
 }
 
 // getSources returns a list of the names of the available quoteGetters.

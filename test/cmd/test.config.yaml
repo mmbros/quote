@@ -1,0 +1,31 @@
+# quote configuration file
+
+database: /home/user/quote.sqlite3
+
+workers: 2
+
+proxy: proxy1
+
+proxies:
+    none: 
+    proxy1: socks5://localhost:9051
+    proxy2: socks5://localhost:9052
+
+isins:
+    isin1:
+        sources: [source1]
+    isin2:
+        sources: [source2]
+    isin3:
+        sources: [source1, source2]
+    isinEmpty:
+
+sources:
+    source1:
+        proxy: none
+        disabled: y
+    source2:
+        disabled: false
+        workers: 10
+    sourceEmpty:
+

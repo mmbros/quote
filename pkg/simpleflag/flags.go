@@ -8,55 +8,55 @@ import (
 
 // String is a flag of string type
 type String struct {
-	value  string
-	passed bool
+	Value  string
+	Passed bool
 }
 
 // Int is a flag of int type
 type Int struct {
-	value  int
-	passed bool
+	Value  int
+	Passed bool
 }
 
 // Bool is a flag of bool type
 type Bool struct {
-	value  bool
-	passed bool
+	Value  bool
+	Passed bool
 }
 
 // Strings is a flag of []string type
 type Strings []string
 
 func (o *String) String() string {
-	return o.value
+	return o.Value
 }
 
 // Set method of flag.Value interface
 func (o *String) Set(value string) error {
-	o.passed = true
-	o.value = value
+	o.Passed = true
+	o.Value = value
 	return nil
 }
 
 func (o *Int) String() string {
-	return strconv.Itoa(o.value)
+	return strconv.Itoa(o.Value)
 }
 
 // Set method of flag.Value interface
 func (o *Int) Set(value string) (err error) {
-	o.passed = true
-	o.value, err = strconv.Atoi(value)
+	o.Passed = true
+	o.Value, err = strconv.Atoi(value)
 	return
 }
 
 func (o *Bool) String() string {
-	return strconv.FormatBool(o.value)
+	return strconv.FormatBool(o.Value)
 }
 
 // Set method of flag.Value interface
 func (o *Bool) Set(value string) (err error) {
-	o.passed = true
-	o.value, err = strconv.ParseBool(value)
+	o.Passed = true
+	o.Value, err = strconv.ParseBool(value)
 	return
 }
 

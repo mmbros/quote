@@ -10,19 +10,35 @@ import (
 
 // App is ...
 type App struct {
-	Name     string
-	Usage    string
-	Commands []*Command
-
+	Name          string
+	Usage         string
+	Commands      []*Command
 	Writer        io.Writer
 	ErrorHandling flag.ErrorHandling
+
+	// Command that will be executed.
+	// Setted by Parse (if no error is returned).
+	execCmdCommand *Command
+}
+
+func (app *App) CommandName() string {
+	if app.execCmdCommand == nil {
+		return ""
+	}
+	return app.execCmdCommand.Name()
 }
 
 // Command is ...
 type Command struct {
+	// Names contains the various names of the command,
+	// separated by a comma (",") with no spaces.
+	// The first name is the main name of the command.
+	// Eventually, the other name are aliases.
 	Names   string
 	Usage   string
 	Options []*Option
+
+	Run func() error
 }
 
 // Option is ...
@@ -31,16 +47,21 @@ type Option struct {
 	Names string
 }
 
-// Output is ...
-func (a *App) Output() io.Writer {
-	if a.Writer == nil {
-		return os.Stderr
-	}
-	return a.Writer
+// Name returns the first name of the command
+func (cmd *Command) Name() string {
+	return strings.SplitN(cmd.Names, ",", 2)[0]
 }
 
-func (a *App) findCommandByName(name string) *Command {
-	for _, cmd := range a.Commands {
+// Output is ...
+func (app *App) Output() io.Writer {
+	if app.Writer == nil {
+		return os.Stderr
+	}
+	return app.Writer
+}
+
+func (app *App) findCommandByName(name string) *Command {
+	for _, cmd := range app.Commands {
 		for _, n := range strings.Split(cmd.Names, ",") {
 			if n == name {
 				return cmd
@@ -52,13 +73,13 @@ func (a *App) findCommandByName(name string) *Command {
 
 // failf prints to app.Output a formatted error and usage message and
 // returns the error.
-func (a *App) usageFailf(format string, v ...interface{}) error {
-	out := a.Output()
+func (app *App) usageFailf(format string, v ...interface{}) error {
+	out := app.Output()
 	err := fmt.Errorf(format, v...)
 	fmt.Fprintln(out, err)
-	fmt.Fprintln(out, a.Usage)
+	fmt.Fprintln(out, app.Usage)
 
-	switch a.ErrorHandling {
+	switch app.ErrorHandling {
 	case flag.PanicOnError:
 		panic(err)
 	case flag.ExitOnError:
@@ -68,18 +89,38 @@ func (a *App) usageFailf(format string, v ...interface{}) error {
 	return err
 }
 
+// FlagSet returns a FlagSet based on command options
+func (cmd *Command) FlagSet(out io.Writer) *flag.FlagSet {
+	name := cmd.Name()
+	fs := flag.NewFlagSet(name, flag.ContinueOnError)
+	fs.SetOutput(out)
+	fs.Usage = func() {
+		fmt.Fprintln(fs.Output(), cmd.Usage)
+	}
+	// populate FlagSet variables with command options
+	for _, opt := range cmd.Options {
+		for _, name := range strings.Split(opt.Names, ",") {
+			fs.Var(opt.Value, name, "")
+		}
+	}
+	return fs
+}
+
 // Parse parses flag definitions from the argument list,
 // which should not include the command name.
 // Must be called after all flags in the FlagSet are defined
 // and before flags are accessed by the program.
-func (a *App) Parse(arguments []string) error {
+func (app *App) Parse(arguments []string) error {
+	// reset the requested command
+	app.execCmdCommand = nil
+
 	if arguments == nil || len(arguments) == 0 {
-		return a.usageFailf("no arguments")
+		return app.usageFailf("no arguments")
 	}
-	out := a.Output()
+	out := app.Output()
 
 	initFlagSet := func(name, usage string) *flag.FlagSet {
-		fs := flag.NewFlagSet(name, a.ErrorHandling)
+		fs := flag.NewFlagSet(name, app.ErrorHandling)
 		fs.SetOutput(out)
 		fs.Usage = func() {
 			fmt.Fprintln(out, usage)
@@ -89,23 +130,43 @@ func (a *App) Parse(arguments []string) error {
 
 	cmdName := arguments[0]
 	if strings.HasPrefix(cmdName, "-") {
-		fs := initFlagSet("", a.Usage)
+		// TODO: make app like command interface and use (cmd *Command) FlagSet
+		fs := initFlagSet("", app.Usage)
 		return fs.Parse(arguments)
 	}
 
-	cmd := a.findCommandByName(cmdName)
+	cmd := app.findCommandByName(cmdName)
 	if cmd == nil {
-		return a.usageFailf("unknown command %q", cmdName)
+		return app.usageFailf("unknown command %q", cmdName)
 	}
 
-	fs := initFlagSet(cmdName, cmd.Usage)
+	fs := cmd.FlagSet(out)
 
-	// populate FlagSet variables with command options
-	for _, opt := range cmd.Options {
-		for _, name := range strings.Split(opt.Names, ",") {
-			fs.Var(opt.Value, name, "")
+	err := fs.Parse(arguments[1:])
+
+	if err == nil {
+		// save the requested command
+		app.execCmdCommand = cmd
+	}
+	return err
+}
+
+func (app *App) Run() error {
+
+	if app.execCmdCommand == nil {
+		return fmt.Errorf("nothing to do: no command has successfully be parsed")
+	}
+	if app.execCmdCommand.Run == nil {
+		return fmt.Errorf("nothing to do: %q command has Run function undefined", app.execCmdCommand.Name())
+	}
+	return app.execCmdCommand.Run()
+}
+
+func (app *App) GetCommand(name string) *Command {
+	for _, cmd := range app.Commands {
+		if cmd.Name() == name {
+			return cmd
 		}
 	}
-
-	return fs.Parse(arguments[1:])
+	return nil
 }

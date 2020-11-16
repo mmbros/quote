@@ -5,639 +5,401 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/spf13/viper"
-
+	"github.com/mmbros/quote/internal/quote"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var allSources1 = []string{"source1", "source2", "source3", "sourceX"}
+func TestUnmarshal(t *testing.T) {
 
-var yamlConfig1 = `
-workers: 5
-proxy: other
+	dataYaml := []byte(`
+# quote configuration file
+database: /home/user/quote.sqlite3
+workers: 2
+proxy: proxy1
 proxies:
-  - proxy: tor
-    url: socks5://127.0.0.1:9050
-  - proxy: none
-  - proxy: other
-    url: https://127.0.0.1:7777
-sources: 
-  - source: source1
-    proxy: none
-  - source: source2
-    proxy: tor
-    workers: 2
-  - source: source3
-    workers: 3
+    proxy1: socks5://localhost:9051
+    none:
 isins:
-  - isin: isin1
-    name: Name of isin1 
-    sources: [source1]
-  - isin: isin2
-    name: Name of isin2
-    sources: 
-      - source1
-      - source2
-`
+    isin1:
+        sources: [source1]
+sources:
+    source1:
+        proxy: none
+        disabled: y
+`)
 
-// // set of string type
-// type set map[string]struct{}
+	dataToml := []byte(`
+# quote configuration file
 
-// func newSet(keys []string) set {
-// 	s := set{}
-// 	for _, k := range keys {
-// 		s[k] = struct{}{}
-// 	}
-// 	return s
-// }
+database = "/home/user/quote.sqlite3"
 
-// func (s set) has(key string) bool {
-// 	_, ok := s[key]
-// 	return ok
-// }
+workers = 2
 
-func initViperConfig(config string) {
-	viper.SetConfigType("yaml")
-	viper.AutomaticEnv() // read in environment variables that match
-	viper.ReadConfig(strings.NewReader(config))
-}
+proxy = "proxy1"
 
-func TestParseArgSource(t *testing.T) {
-	testCases := []struct {
-		input   string
-		source  string
-		workers int
-		err     bool
-	}{
-		{
-			input:  "source",
-			source: "source",
+[proxies]
+proxy1 = "socks5://localhost:9051"
+none = ""
+
+[isins]
+
+[isins.isin1]
+sources = ["source1"]
+disabled = false
+
+[sources]
+
+[sources.source1]
+proxy = "none"
+disabled = true
+`)
+
+	dataJSON := []byte(`{
+	"database": "/home/user/quote.sqlite3",
+	"workers": 2,
+	"proxy": "proxy1",
+	"proxies": {
+	  "none": "",
+	  "proxy1": "socks5://localhost:9051"
+	},
+	"sources": {
+	  "source1": {
+		 "disabled": true,
+		 "proxy": "none"
+	  }
+	},
+	"isins": {
+	  "isin1": {
+		  "sources": [
+			"source1"
+		  ]
+	  }
+	}
+  }
+  `)
+
+	expected := &Config{
+		Database: "/home/user/quote.sqlite3",
+		Workers:  2,
+		Proxy:    "proxy1",
+		Proxies: map[string]string{
+			"proxy1": "socks5://localhost:9051",
+			"none":   "",
 		},
-		{
-			input:   "source:99",
-			source:  "source",
-			workers: 99,
+		Isins: map[string]*isinItem{
+			"isin1": {
+				Sources: []string{"source1"},
+			},
 		},
-		{
-			input:   "source/99",
-			source:  "source",
-			workers: 99,
-		},
-		{
-			input:   "source#99",
-			source:  "source",
-			workers: 99,
-		},
-		{
-			input: "source:",
-			err:   true,
-		},
-		{
-			input: "#99",
-			err:   true,
-		},
-		{
-			input: "source#nan",
-			err:   true,
+		Sources: map[string]*sourceItem{
+			"source1": {
+				Proxy:    "none",
+				Disabled: true,
+			},
 		},
 	}
-	for _, tc := range testCases {
-		s, w, err := parseArgSource(tc.input, ":/#")
-		if tc.err {
-			if assert.Error(t, err, "input %q", tc.input) {
-				assert.Contains(t, err.Error(), "invalid source in args", tc.input)
+
+	cases := []struct {
+		fmt  string
+		data []byte
+	}{
+		{"yaml", dataYaml},
+		{"yml", dataYaml},
+		{"", dataYaml},
+		{"toml", dataToml},
+		{"", dataToml},
+		{"json", dataJSON},
+		{"", dataJSON},
+	}
+
+	var cfg *Config
+
+	for _, c := range cases {
+		cfg = &Config{}
+		err := unmarshal(c.data, cfg, c.fmt)
+		msg := fmt.Sprintf("case with fmt %q, len(data)=%d", c.fmt, len(c.data))
+		if assert.NoError(t, err, msg) {
+			assert.Equal(t, expected, cfg, msg)
+		}
+	}
+}
+
+func TestUnmarshalError(t *testing.T) {
+
+	cases := []struct {
+		fmt     string
+		strdata string
+		errmsg  string
+	}{
+		{"", "x y z", "Unknown format"},
+		{"config", "x y z", "Unsupported format"},
+	}
+
+	var cfg *Config
+
+	for _, c := range cases {
+		cfg = &Config{}
+		err := unmarshal([]byte(c.strdata), cfg, c.fmt)
+		msg := fmt.Sprintf("case with fmt %q", c.fmt)
+		if assert.Error(t, err, msg) {
+			assert.Contains(t, err.Error(), c.errmsg, msg)
+		}
+	}
+}
+
+func TestGetFileFormat(t *testing.T) {
+
+	cases := []struct {
+		path string
+		fmt  string
+		want string
+	}{
+		{"/home/user/config.YAML", "", "yaml"},
+		{"config.toml", "EXT", "ext"},
+		{"config", "", ""},
+	}
+
+	for _, c := range cases {
+		got := getFileFormat(c.path, c.fmt)
+		assert.Equal(t, c.want, got, c)
+	}
+}
+
+func initAppGetArgs(options string) (*appArgs, error) {
+	args := &appArgs{}
+	cmd := initCommandGet(args)
+	fs := cmd.FlagSet(nil)
+	err := fs.Parse(strings.Split(options, " "))
+
+	return args, err
+}
+
+func TestWorkers(t *testing.T) {
+	availableSources := []string{"source1"}
+
+	cases := map[string]struct {
+		argtxt string
+		cfgtxt string
+		want   []*quote.SourceIsins
+		errmsg string
+	}{
+		"none": {
+			want: []*quote.SourceIsins{},
+		},
+		"workers = 0": {
+			argtxt: "-w 0 -i isin1",
+			errmsg: "workers must be greater than zero",
+		},
+		"workers < 0": {
+			argtxt: "-w -10 -i isin1",
+			errmsg: "workers must be greater than zero",
+		},
+		"workers > 0": {
+			argtxt: "-w 10 -i isin1",
+			want: []*quote.SourceIsins{
+				{Source: "source1", Workers: 10, Isins: []string{"isin1"}},
+			},
+		},
+		"default with args": {
+			argtxt: "-i isin1",
+			want: []*quote.SourceIsins{
+				{Source: "source1", Workers: defaultWorkers, Isins: []string{"isin1"}},
+			},
+		},
+		"default with cfg": {
+			cfgtxt: `isins:
+  isin1:
+    sources: [source1]`,
+			want: []*quote.SourceIsins{
+				{Source: "source1", Workers: defaultWorkers, Isins: []string{"isin1"}},
+			},
+		},
+		"args with source1:0": {
+			argtxt: "-i isin1 -s source1:0",
+			want: []*quote.SourceIsins{
+				{Source: "source1", Workers: defaultWorkers, Isins: []string{"isin1"}},
+			},
+		},
+		"args with source1:-1": {
+			argtxt: "-i isin1 -s source1:-1",
+			errmsg: "workers must be greater than zero",
+		},
+		"args with source1:100": {
+			argtxt: "-i isin1 -s source1:100",
+			want: []*quote.SourceIsins{
+				{Source: "source1", Workers: 100, Isins: []string{"isin1"}},
+			},
+		},
+		"args with source1#100": {
+			argtxt: "-i isin1 -s source1#100",
+			want: []*quote.SourceIsins{
+				{Source: "source1", Workers: 100, Isins: []string{"isin1"}},
+			},
+		},
+		"args with source1/100": {
+			argtxt: "-i isin1 -s source1/100",
+			want: []*quote.SourceIsins{
+				{Source: "source1", Workers: 100, Isins: []string{"isin1"}},
+			},
+		},
+		"cfg source with workers=0": {
+			argtxt: "--config-type=yaml",
+			cfgtxt: `
+isins:
+  isin1:
+sources:
+  source1:
+    workers: 0
+`,
+			want: []*quote.SourceIsins{
+				{Source: "source1", Workers: defaultWorkers, Isins: []string{"isin1"}},
+			},
+		},
+		"cfg source with workers=-1": {
+			argtxt: "--config-type=yaml",
+			cfgtxt: `
+isins:
+  isin1:
+sources:
+  source1:
+    workers: -1
+`,
+			errmsg: "workers must be greater than zero (source \"source1\" has workers=-1)",
+		},
+		"cfg with workers=-1": {
+			argtxt: "--config-type=yaml",
+			cfgtxt: `
+workers: -10
+isins:
+  isin1:
+`,
+			errmsg: "workers must be greater than zero (workers=-10)",
+		},
+	}
+	for title, c := range cases {
+
+		cfg := &Config{}
+		args, _ := initAppGetArgs(c.argtxt)
+		err := cfg.auxGetConfig([]byte(c.cfgtxt), args, availableSources)
+
+		if c.errmsg != "" {
+			if assert.Error(t, err, title) {
+				assert.Contains(t, err.Error(), c.errmsg, title)
 			}
 		} else {
-			if assert.NoError(t, err, "input %q", tc.input) {
-				assert.Equal(t, tc.source, s, "input %q: source", tc.input)
-				assert.Equal(t, tc.workers, w, "input %q: workers", tc.input)
+			if assert.NoError(t, err, title) {
+				got := cfg.SourceIsinsList()
+				assert.ElementsMatch(t, c.want, got, title)
 			}
 		}
 	}
 }
 
-func TestFullNotValidatedConfig(t *testing.T) {
+func TestProxy(t *testing.T) {
 
-	initViperConfig(yamlConfig1)
+	availableSources := []string{"source1", "source2", "source3"}
 
-	args := &cmdGetArgs{
-		Proxy:       "arg://proxy",
-		PassedProxy: true,
-		Isins:       []string{"isin1", "isinY"},
-		Sources:     []string{"source1#101", "source2", "sourceY/12"},
-	}
+	yaml1 := `
+proxy: common
 
-	cfg, err := getFullNotValidatedConfig(args, allSources1)
-	require.NoError(t, err, "getFullNotValidatedConfig")
+isins:
+  isin1:
 
-	if args.Sources == nil {
-		sourceName := "sourceX" // in all sources but not in config
-		s := cfg.Sources[sourceName]
-		if assert.True(t, s != nil, "source[%q] not found", sourceName) {
-			assert.True(t, !s.Disabled, "source[%q].disabled", sourceName)
-		}
-	} else {
-		swmap := map[string]int{}
-		for _, sw := range args.Sources {
-			s, w, _ := parseArgSource(sw, sepsSourceWorkers)
-			swmap[s] = w
-		}
+proxies:
+  none: 
+  common: http://common
+  proxy2: http://proxy2
 
-		// check all args sources are found in cfg sources
-		// check also the source.workers value
-		for s, w := range swmap {
-			source, ok := cfg.Sources[s]
-			if assert.True(t, ok, "args source %q not found in cfg", s) {
-				if w != 0 {
-					assert.Equal(t, w, source.Workers, "source[%q].workers", source.Source)
-				}
-			}
-		}
+sources:
+  source1:
+    proxy: http://proxy1
+  source2:
+    proxy: none
+`
 
-		// check only sources in args are enabled
-		for _, s := range cfg.Sources {
-			_, ok := swmap[s.Source]
-			assert.Equal(t, !ok, s.Disabled, "source[%q].disabled", s.Source)
-		}
-	}
-
-	if args.Isins != nil {
-		// check all args isins are found in cfg isins
-		for _, i := range args.Isins {
-			_, ok := cfg.Isins[i]
-			assert.True(t, ok, "args isin %q not found in cfg", i)
-		}
-		// check only isins in args are enabled
-		isinsArgsSet := newSet(args.Isins)
-		for _, i := range cfg.Isins {
-			ok := isinsArgsSet.has(i.Isin)
-			assert.Equal(t, !ok, i.Disabled, "isin[%q].disabled", i.Isin)
-		}
-	}
-
-	// t.Log(cfg)
-	// t.Fail()
-
-}
-
-func TestArgsProxy(t *testing.T) {
-	testCases := []struct {
-		title  string
-		proxy  string
-		passed bool
+	cases := map[string]struct {
+		argtxt string
+		cfgtxt string
 		want1  string
 		want2  string
 		want3  string
-		wantX  string
+		errmsg string
 	}{
-		{
-			title:  "passed",
-			proxy:  "test://proxy",
-			passed: true,
-			want1:  "",
-			want2:  "socks5://127.0.0.1:9050",
-			want3:  "test://proxy",
-			wantX:  "test://proxy",
+		"args only": {
+			argtxt: "-i isin1",
 		},
-		{
-			title:  "passed-ref",
-			proxy:  "tor",
-			passed: true,
-			want1:  "",
-			want2:  "socks5://127.0.0.1:9050",
-			want3:  "socks5://127.0.0.1:9050",
-			wantX:  "socks5://127.0.0.1:9050",
+		"args only with proxy": {
+			argtxt: "-i isin1 -p x://y",
+			want1:  "x://y",
+			want2:  "x://y",
+			want3:  "x://y",
 		},
-		{
-			title:  "passed-empty",
-			proxy:  "",
-			passed: true,
-			want1:  "",
-			want2:  "socks5://127.0.0.1:9050",
+		"args invalid proxy": {
+			argtxt: "-i isin1 -p x://\\",
+			errmsg: "invalid proxy",
+		},
+		"args ignored unused invalid proxy": {
+			argtxt: "-p x://\\",
+		},
+		"cfg only": {
+			cfgtxt: yaml1,
+			want1:  "http://proxy1",
+			want2:  "",
+			want3:  "http://common",
+		},
+		"cfg with arg proxy": {
+			argtxt: "-p http://args",
+			cfgtxt: yaml1,
+			want1:  "http://proxy1",
+			want2:  "",
+			want3:  "http://args",
+		},
+		"cfg with arg proxy-ref": {
+			argtxt: "-p proxy2",
+			cfgtxt: yaml1,
+			want1:  "http://proxy1",
+			want2:  "",
+			want3:  "http://proxy2",
+		},
+		"cfg with arg proxy-ref to none": {
+			argtxt: "-p none",
+			cfgtxt: yaml1,
+			want1:  "http://proxy1",
+			want2:  "",
 			want3:  "",
-			wantX:  "",
-		},
-		{
-			title:  "not-passed",
-			passed: false,
-			want1:  "",
-			want2:  "socks5://127.0.0.1:9050",
-			want3:  "https://127.0.0.1:7777",
-			wantX:  "https://127.0.0.1:7777",
 		},
 	}
+	for title, c := range cases {
 
-	initViperConfig(yamlConfig1)
+		cfg := &Config{}
+		args, err := initAppGetArgs(c.argtxt)
+		require.NoError(t, err)
+		err = cfg.auxGetConfig([]byte(c.cfgtxt), args, availableSources)
 
-	for j, tc := range testCases {
-		if j < 0 {
-			continue
-		}
+		if c.errmsg != "" {
+			if assert.Error(t, err, title) {
+				assert.Contains(t, err.Error(), c.errmsg, title)
+			}
+		} else {
+			if assert.NoError(t, err, title) {
+				got := cfg.SourceIsinsList()
+				mgot := map[string]string{}
+				for _, si := range got {
+					mgot[si.Source] = si.Proxy
+				}
+				mwant := map[string]string{
+					"source1": c.want1,
+					"source2": c.want2,
+					"source3": c.want3,
+				}
 
-		args := &cmdGetArgs{
-			Proxy:       tc.proxy,
-			PassedProxy: tc.passed,
-			Isins:       []string{"isinY"},
-			Sources:     allSources1,
-		}
-		cfg, err := getConfig(args, allSources1)
-		require.NoError(t, err, "getConfig")
-		assert.Equal(t, tc.want1, cfg.Sources["source1"].Proxy, "%s: source1.proxy", tc.title)
-		assert.Equal(t, tc.want2, cfg.Sources["source2"].Proxy, "%s: source1.proxy", tc.title)
-		assert.Equal(t, tc.want3, cfg.Sources["source3"].Proxy, "%s: source3.proxy", tc.title)
-		assert.Equal(t, tc.wantX, cfg.Sources["sourceX"].Proxy, "%s: sourceX.proxy", tc.title)
-	}
-
-}
-
-func TestArgsWorkers(t *testing.T) {
-	testCases := []struct {
-		title   string
-		workers int
-		passed  bool
-		want1   int
-		want2   int
-		want3   int
-		wantX   int
-	}{
-		{
-			title:   "passed",
-			workers: 10,
-			passed:  true,
-			want1:   10,
-			want2:   2,
-			want3:   3,
-			wantX:   10,
-		},
-		{
-			title:  "not-passed",
-			passed: false,
-			want1:  5,
-			want2:  2,
-			want3:  3,
-			wantX:  5,
-		},
-	}
-	initViperConfig(yamlConfig1)
-
-	for _, tc := range testCases {
-		args := &cmdGetArgs{
-			Workers:       tc.workers,
-			PassedWorkers: tc.passed,
-			Isins:         []string{"isinY"},
-			Sources:       allSources1,
-		}
-
-		cfg, err := getConfig(args, allSources1)
-		require.NoError(t, err, "getConfig")
-		assert.Equal(t, tc.want1, cfg.Sources["source1"].Workers, "%s: source1.workers", tc.title)
-		assert.Equal(t, tc.want2, cfg.Sources["source2"].Workers, "%s: source1.workers", tc.title)
-		assert.Equal(t, tc.want3, cfg.Sources["source3"].Workers, "%s: source3.workers", tc.title)
-		assert.Equal(t, tc.wantX, cfg.Sources["sourceX"].Workers, "%s: sourceX.workers", tc.title)
-	}
-
-}
-
-func TestWorkersError(t *testing.T) {
-	//
-	// args.workers <= 0
-	//
-	initViperConfig(yamlConfig1)
-	args := &cmdGetArgs{
-		Workers:       0,
-		PassedWorkers: true,
-		Isins:         []string{"isinY"},
-		Sources:       allSources1,
-	}
-	cfg, err := getConfig(args, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "workers must be greater than zero", "args.workers")
-	}
-
-	//
-	// cfg.workers = -1
-	//
-	args = &cmdGetArgs{
-		Isins:   []string{"isinY"},
-		Sources: allSources1,
-	}
-	initViperConfig("workers: -1")
-	cfg, err = getConfig(args, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "workers must be greater than zero", "cfg.workers")
-	}
-
-	//
-	// cfg.workers = 0
-	//
-	initViperConfig("workers: 0")
-	args = &cmdGetArgs{
-		Isins:   []string{"isinY"},
-		Sources: allSources1,
-	}
-	cfg, err = getConfig(args, allSources1)
-
-	name := "source1"
-	if assert.True(t, cfg.Sources[name] != nil, "source %q not found!", name) {
-		assert.Equal(t, defaultWorkers, cfg.Sources[name].Workers, "source[%q].workers", name)
-	}
-}
-
-func TestDefaults(t *testing.T) {
-	flgs := getCmd.Flags()
-
-	args := &cmdGetArgs{
-		Isins:   []string{"isinY"},
-		Sources: allSources1,
-	}
-	args.Workers, _ = flgs.GetInt("workers")
-	args.Proxy, _ = flgs.GetString("proxy")
-
-	initViperConfig("")
-
-	cfg, err := getConfig(args, allSources1)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	name := "source1"
-	if cfg.Sources[name] == nil {
-		t.Fatalf("source %q not found!", name)
-	}
-	assert.Equal(t, defaultWorkers, cfg.Sources[name].Workers, "source[%q].workers", name)
-	assert.Equal(t, cfg.Sources[name].Proxy, "", "source[%q].proxy", name)
-}
-
-func TestSourcesFilter(t *testing.T) {
-	initViperConfig(`
-isins:
-- isin: isin1
-  sources: [source1]
-- isin: isin2
-  sources: [source1, source2]
-`)
-	cfg, err := getConfig(nil, allSources1)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	assert.Equal(t, 2, len(cfg.Sources), "len(cfg.Sources)")
-	for _, s := range []string{"source1", "source2"} {
-		_, ok := cfg.Sources[s]
-		assert.Equal(t, true, ok, s)
-	}
-}
-
-func TestSourcesUnknown(t *testing.T) {
-	// 1. unknown source in config
-	initViperConfig(`
-isins:
-- isin: isin1
-  sources: [source1, sourceZ]
-`)
-	cfg, err := getConfig(nil, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "required source", "unknown source in config")
-	}
-
-	// 2. unknown source in args
-	args := &cmdGetArgs{
-		Isins:   []string{"isinY"},
-		Sources: []string{"sourceY"},
-	}
-	initViperConfig("")
-	cfg, err = getConfig(args, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "required source", "unknown source in args")
-	}
-
-	if t.Failed() {
-		t.Log(cfg)
-	}
-
-}
-
-func TestSourcesEmpty(t *testing.T) {
-	initViperConfig(`
-isins:
-- isin: isin1
-  sources: [source1]
-sources:
-- source: source1
-  disabled: y
-`)
-	_, err := getConfig(nil, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "without enabled sources", "unknown source in args")
-	}
-}
-
-func TestSourcesDisabled(t *testing.T) {
-	initViperConfig(`
-isins:
-- isin: isin1
-sources:
-- source: source1
-  disabled: y
-`)
-	cfg, err := getConfig(nil, allSources1)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-	}
-	assert.Equal(t, 3, len(cfg.Sources), "len(cfg.Sources)")
-	for _, s := range []string{"source2", "source3", "sourceX"} {
-		_, ok := cfg.Sources[s]
-		assert.Equal(t, true, ok, s)
-	}
-}
-
-func TestSourceWorkers(t *testing.T) {
-	initViperConfig(`
-isins:
-- isin: isin1
-sources:
-- source: source1
-  workers: -1
-`)
-	_, err := getConfig(nil, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "workers must be greater than zero", "source1")
-	}
-}
-
-func TestSourceProxy(t *testing.T) {
-	initViperConfig(`
-isins:
-- isin: isin1
-sources:
-- source: source1
-  proxy: ::xxx
-`)
-	_, err := getConfig(nil, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "invalid proxy", "source1")
-	}
-}
-
-func TestKeyProxy(t *testing.T) {
-	initViperConfig(`
-isins:
-- isin: isin1
-proxies:
-- url: htps://proxy
-`)
-	_, err := getConfig(nil, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "Invalid proxies: missing \"proxy\" key", "proxy")
-	}
-}
-func TestKeyIsin(t *testing.T) {
-	initViperConfig(`
-isins:
-- sources: ["source1"]
-`)
-	_, err := getConfig(nil, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "Invalid isins: missing \"isin\" key", "isin")
-	}
-}
-func TestKeySource(t *testing.T) {
-	initViperConfig(`
-sources:
-- proxy: https://proxy
-`)
-	_, err := getConfig(nil, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "Invalid sources: missing \"source\" key", "source")
-	}
-}
-
-func TestArgsDatabase(t *testing.T) {
-	db := "/home/user/config.toml"
-	args := &cmdGetArgs{
-		Database:       db,
-		PassedDatabase: true,
-		Isins:          []string{"isinY"},
-		Sources:        allSources1,
-	}
-	initViperConfig("")
-	cfg, err := getConfig(args, allSources1)
-	if assert.NoError(t, err) {
-		assert.Equal(t, db, cfg.Database, "database")
-	}
-}
-
-func TestConfigDatabase(t *testing.T) {
-
-	db := "/home/user/quote.sqlite3"
-	config := fmt.Sprintf("database: %s\nisins:\n- isin: isin1", db)
-	initViperConfig(config)
-	cfg, err := getConfig(nil, allSources1)
-	if assert.NoError(t, err) {
-		assert.Equal(t, db, cfg.Database, "database")
-	}
-}
-func TestArgsInvalidSource(t *testing.T) {
-	initViperConfig(yamlConfig1)
-	args := &cmdGetArgs{
-		Sources: []string{"source:nan"},
-	}
-	_, err := getConfig(args, allSources1)
-	if assert.Error(t, err) {
-		assert.Contains(t, err.Error(), "invalid source in args")
-	}
-}
-
-func TestIsinSources(t *testing.T) {
-	const isinY = "isinY"
-
-	testCases := []struct {
-		title           string
-		args            *cmdGetArgs
-		config          string
-		allSources      []string
-		expectedSources []string
-	}{
-		{
-			title: "isinY in config: no source in args, no source in config",
-			args:  nil,
-			config: `isins: 
-- isin: ` + isinY,
-			allSources:      allSources1,
-			expectedSources: allSources1,
-		},
-		{
-			title: "isinY in args: no source in args, no source in config",
-			args: &cmdGetArgs{
-				Isins: []string{isinY},
-			},
-			config:          "",
-			allSources:      allSources1,
-			expectedSources: allSources1,
-		},
-		{
-			title: "isinY in args: source in args overwrite source in config",
-			args: &cmdGetArgs{
-				Isins:   []string{isinY},
-				Sources: []string{"source3", "sourceX"},
-			},
-			config: `
-isins:
-  - isin: isinY
-    sources: [source1, source2]
-`,
-			allSources:      allSources1,
-			expectedSources: []string{"sourceX", "source3"},
-		},
-		{
-			title: "isinY in args: source in args are used even if disabled",
-			args: &cmdGetArgs{
-				Isins:   []string{isinY},
-				Sources: []string{"source3", "sourceX"},
-			},
-			config: `
-sources:
-  - source: source3
-    disabled: yes
-`,
-			allSources:      allSources1,
-			expectedSources: []string{"sourceX", "source3"},
-		},
-		{
-			title: "no source in args: sources disabled are not used",
-			args:  nil,
-			config: `
-isins:
-  - isin: isinY
-sources:
-  - source: source3
-    disabled: yes
-`,
-			allSources:      allSources1,
-			expectedSources: []string{"sourceX", "source1", "source2"},
-		},
-	}
-	copts := cmp.Options{
-		cmpopts.SortSlices(func(a, b string) bool {
-			return a < b
-		}),
-	}
-
-	for _, tc := range testCases {
-		initViperConfig(tc.config)
-		cfg, err := getConfig(tc.args, tc.allSources)
-		if err != nil {
-			t.Errorf("%s: error unexpected: %v", tc.title, err)
-		} else if cfg.Isins[isinY] == nil {
-			t.Errorf("%s: ???: %s not found in cfg", tc.title, isinY)
-		} else if diff := cmp.Diff(tc.expectedSources, cfg.Isins[isinY].Sources, copts); diff != "" {
-			t.Errorf("%s: mismatch (-want +got):\n%s", tc.title, diff)
-		}
-
-		if t.Failed() {
-			t.Log(cfg)
+				for s, want := range mwant {
+					if want != mgot[s] {
+						t.Errorf("case %q: %q: want %q, got %q", title, s, want, mgot[s])
+					}
+				}
+			}
 		}
 	}
 }

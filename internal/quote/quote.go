@@ -167,7 +167,10 @@ func getResults(items []*SourceIsins, mode taskengine.Mode) ([]*resultGetQuote, 
 	// WorkerTasks
 	wts := make(taskengine.WorkerTasks)
 
-	quoteGetter := initQuoteGetters(items)
+	quoteGetter, err := initQuoteGetters(items)
+	if err != nil {
+		return nil, err
+	}
 
 	for _, item := range items {
 

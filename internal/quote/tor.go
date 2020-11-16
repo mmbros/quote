@@ -18,7 +18,10 @@ func TorCheck(proxy string) (bool, string, error) {
 	// URL to fetch
 	var webURL string = "https://check.torproject.org"
 
-	client := quotegetter.DefaultClient(proxy)
+	client, err := quotegetter.DefaultClient(proxy)
+	if err != nil {
+		return false, "", err
+	}
 	// Make request
 	resp, err := client.Get(webURL)
 	if err != nil {
