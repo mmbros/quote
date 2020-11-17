@@ -457,3 +457,77 @@ sources:
 		}
 	}
 }
+
+func TestIsin(t *testing.T) {
+
+	// important: the test is based on the presence of only one source
+	availableSources := []string{"source1"}
+
+	cases := map[string]struct {
+		argtxt string
+		cfgtxt string
+		wants  string
+		errmsg string
+	}{
+		"args only": {
+			argtxt: "-i isin1",
+			wants:  "isin1",
+		},
+		"args only with two isins (a)": {
+			argtxt: "-i isin1 -i isin2",
+			wants:  "isin1,isin2",
+		},
+		"args only with two isins (b)": {
+			argtxt: "-i isin1,isin2",
+			wants:  "isin1,isin2",
+		},
+		"args only with multiple isins": {
+			argtxt: "-i isin1,isin2 --isin isin3,isin4",
+			wants:  "isin1,isin2,isin3,isin4",
+		},
+		"cfg only": {
+			cfgtxt: `isins:
+  isin1:`,
+			wants: "isin1",
+		},
+		"cfg only disabled": {
+			cfgtxt: `isins:
+  isin1:
+    disabled: true
+  isin2:
+  `,
+			wants: "isin2",
+		},
+		"args wins over cfg": {
+			argtxt: "-i isin1",
+			cfgtxt: `isins:
+  isin1:
+    disabled: true
+  isin2:
+  `,
+			wants: "isin1",
+		},
+	}
+	for title, c := range cases {
+
+		cfg := &Config{}
+		args, err := initAppGetArgs(c.argtxt)
+		require.NoError(t, err)
+		err = cfg.auxGetConfig([]byte(c.cfgtxt), args, availableSources)
+
+		if c.errmsg != "" {
+			if assert.Error(t, err, title) {
+				assert.Contains(t, err.Error(), c.errmsg, title)
+			}
+		} else {
+			if assert.NoError(t, err, title) {
+				sis := cfg.SourceIsinsList()
+				if assert.Equal(t, len(sis), 1, title) {
+					got := sis[0].Isins
+					want := strings.Split(c.wants, ",")
+					assert.ElementsMatch(t, got, want, title)
+				}
+			}
+		}
+	}
+}
