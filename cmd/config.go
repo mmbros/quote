@@ -11,7 +11,7 @@ import (
 
 	"github.com/mmbros/quote/internal/quote"
 	toml "github.com/pelletier/go-toml"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 const (

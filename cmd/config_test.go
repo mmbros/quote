@@ -19,7 +19,7 @@ workers: 2
 proxy: proxy1
 proxies:
     proxy1: socks5://localhost:9051
-    none:
+    none: ""
 isins:
     isin1:
         sources: [source1]
@@ -307,7 +307,7 @@ isins:
   isin1:
 
 proxies:
-  none: 
+  none: ""
   common: http://common
   proxy2: http://proxy2
 
