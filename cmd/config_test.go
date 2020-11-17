@@ -10,6 +10,60 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestParseArgSource(t *testing.T) {
+	testCases := []struct {
+		input   string
+		source  string
+		workers int
+		err     bool
+	}{
+		{
+			input:  "source",
+			source: "source",
+		},
+		{
+			input:   "source:99",
+			source:  "source",
+			workers: 99,
+		},
+		{
+			input:   "source/99",
+			source:  "source",
+			workers: 99,
+		},
+		{
+			input:   "source#99",
+			source:  "source",
+			workers: 99,
+		},
+		{
+			input: "source:",
+			err:   true,
+		},
+		{
+			input: "#99",
+			err:   true,
+		},
+		{
+			input: "source#nan",
+			err:   true,
+		},
+	}
+	for _, tc := range testCases {
+		s, w, err := parseArgSource(tc.input, ":/#")
+		if tc.err {
+			if assert.Error(t, err, "input %q", tc.input) {
+				assert.Contains(t, err.Error(), "invalid source in args", tc.input)
+			}
+		} else {
+			if assert.NoError(t, err, "input %q", tc.input) {
+				assert.Equal(t, tc.source, s, "input %q: source", tc.input)
+				assert.Equal(t, tc.workers, w, "input %q: workers", tc.input)
+			}
+		}
+	}
+}
+
 func TestUnmarshal(t *testing.T) {
 
 	dataYaml := []byte(`
