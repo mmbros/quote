@@ -482,7 +482,7 @@ func TestIsin(t *testing.T) {
 			wants:  "isin1,isin2",
 		},
 		"args only with multiple isins": {
-			argtxt: "-i isin1,isin2 --isin isin3,isin4",
+			argtxt: "-i isin1,isin2 --isins isin3,isin4",
 			wants:  "isin1,isin2,isin3,isin4",
 		},
 		"cfg only": {

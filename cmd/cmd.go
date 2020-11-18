@@ -80,7 +80,7 @@ func initCommandGet(args *appArgs) *simpleflag.Command {
 		{Value: &args.configType, Names: "config-type"},
 		{Value: &args.database, Names: "d,database"},
 		{Value: &args.dryrun, Names: "n,dryrun,dry-run"},
-		{Value: &args.isins, Names: "i,isin"},
+		{Value: &args.isins, Names: "i,isins"},
 		{Value: &args.proxy, Names: "p,proxy"},
 		{Value: &args.sources, Names: "s,sources"},
 		{Value: &args.workers, Names: "w,workers"},
