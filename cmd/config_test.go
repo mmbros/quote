@@ -297,6 +297,10 @@ func TestWorkers(t *testing.T) {
 				{Source: "source1", Workers: 100, Isins: []string{"isin1"}},
 			},
 		},
+		"args with source1:nan": {
+			argtxt: "-i isin1 -s source1:nan",
+			errmsg: "invalid source in args: \"source1:nan\"",
+		},
 		"cfg source with workers=0": {
 			argtxt: "--config-type=yaml",
 			cfgtxt: `
@@ -460,7 +464,7 @@ sources:
 
 func TestIsin(t *testing.T) {
 
-	// important: the test is based on the presence of only one source
+	// important: the test is based on the existance of only one source
 	availableSources := []string{"source1"}
 
 	cases := map[string]struct {
@@ -469,6 +473,7 @@ func TestIsin(t *testing.T) {
 		wants  string
 		errmsg string
 	}{
+
 		"args only": {
 			argtxt: "-i isin1",
 			wants:  "isin1",
@@ -486,26 +491,17 @@ func TestIsin(t *testing.T) {
 			wants:  "isin1,isin2,isin3,isin4",
 		},
 		"cfg only": {
-			cfgtxt: `isins:
-  isin1:`,
-			wants: "isin1",
+			cfgtxt: "[isins.isin1]",
+			wants:  "isin1",
 		},
 		"cfg only disabled": {
-			cfgtxt: `isins:
-  isin1:
-    disabled: true
-  isin2:
-  `,
-			wants: "isin2",
+			cfgtxt: "[isins.isin1]\ndisabled=true\n[isins.isin2]",
+			wants:  "isin2",
 		},
-		"args wins over cfg": {
-			argtxt: "-i isin1",
-			cfgtxt: `isins:
-  isin1:
-    disabled: true
-  isin2:
-  `,
-			wants: "isin1",
+		"arg isin that is disabled in cfg": {
+			argtxt: "-i isin1 --config-type toml",
+			cfgtxt: "[isins.isin1]\ndisabled = true\n[isins.isin2]",
+			wants:  "isin1",
 		},
 	}
 	for title, c := range cases {
@@ -526,6 +522,130 @@ func TestIsin(t *testing.T) {
 					got := sis[0].Isins
 					want := strings.Split(c.wants, ",")
 					assert.ElementsMatch(t, got, want, title)
+				}
+			}
+		}
+	}
+}
+
+func TestSource(t *testing.T) {
+
+	availableSources := []string{"source1", "source2", "source3", "sourceX"}
+
+	// DO NO WORK
+	// "args only explicit duplicate": {
+	// 	argtxt: "-i isin1 --isin isin2 -s source1,source2 --source source1:20",
+	// 	wants: map[string]string{
+	// 		"source1": "isin1,isin2",
+	// 		"source2": "isin1,isin2",
+	// 	},
+	// },
+
+	cases := map[string]struct {
+		argtxt string
+		cfgtxt string
+		wants  map[string]string
+		errmsg string
+	}{
+		"args only explicit": {
+			argtxt: "-i isin1 --isins isin2 -s source1,source2 --sources sourceX",
+			wants: map[string]string{
+				"source1": "isin1,isin2",
+				"source2": "isin1,isin2",
+				"sourceX": "isin1,isin2",
+			},
+		},
+		"args only with no explicit source": {
+			argtxt: "-i isin1 --isins isin2,isin3",
+			wants: map[string]string{
+				"source1": "isin1,isin2,isin3",
+				"source2": "isin1,isin2,isin3",
+				"source3": "isin1,isin2,isin3",
+				"sourceX": "isin1,isin2,isin3",
+			},
+		},
+		"args only with not available source": {
+			argtxt: "-i isin1 --isins isin2 -s source1,source2 --sources sourceY",
+			errmsg: "required source \"sourceY\" is not available",
+		},
+		"arg source disabled in config": {
+			argtxt: "-i isin1 -s source1",
+			cfgtxt: "[sources.source1]\ndisabled = true",
+			wants: map[string]string{
+				"source1": "isin1",
+			},
+		},
+		"source disabled": {
+			argtxt: "-i isin1",
+			cfgtxt: "[sources.source1]\ndisabled = true",
+			wants: map[string]string{
+				"source2": "isin1",
+				"source3": "isin1",
+				"sourceX": "isin1",
+			},
+		},
+		"isins with explicit sources": {
+			argtxt: "--config-type toml",
+			cfgtxt: `
+[isins.isin1]
+sources = ["source1", "source2", "sourceX"]
+[sources.source2]
+disabled = true
+`,
+			wants: map[string]string{
+				"source1": "isin1",
+				"sourceX": "isin1",
+			},
+		},
+		"isin with all disabled sources": {
+			argtxt: "--config-type toml",
+			cfgtxt: `
+[isins.isin1]
+sources = ["source1", "source2"]
+[sources.source1]
+disabled = true
+[sources.source2]
+disabled = true
+`,
+			errmsg: "isin \"isin1\" without enabled sources",
+		},
+		"isin with not existing source": {
+			argtxt: "--config-type toml",
+			cfgtxt: "[isins.isin1]\nsources = [\"source1\", \"sourceY\"]",
+			errmsg: "required source \"sourceY\" is not available",
+		},
+		"empty source in config": {
+			argtxt: "--i isin1 -config-type toml",
+			cfgtxt: "[sources.source1]",
+			wants: map[string]string{
+				"source1": "isin1",
+				"source2": "isin1",
+				"source3": "isin1",
+				"sourceX": "isin1",
+			},
+		},
+	}
+	for title, c := range cases {
+
+		cfg := &Config{}
+		args, err := initAppGetArgs(c.argtxt)
+		require.NoError(t, err)
+		err = cfg.auxGetConfig([]byte(c.cfgtxt), args, availableSources)
+
+		if c.errmsg != "" {
+			if assert.Error(t, err, title) {
+				assert.Contains(t, err.Error(), c.errmsg, title)
+			}
+		} else {
+			if assert.NoError(t, err, title) {
+				sis := cfg.SourceIsinsList()
+				if assert.Equal(t, len(sis), len(c.wants), title) {
+					for _, si := range sis {
+						source := si.Source
+						got := si.Isins
+						want := strings.Split(c.wants[source], ",")
+						assert.ElementsMatch(t, got, want, "%s (%s)", title, source)
+					}
 				}
 			}
 		}
