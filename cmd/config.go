@@ -346,6 +346,9 @@ func (cfg *Config) merge(args *appArgs, allAvailableSources []string) error {
 	return nil
 }
 
+// reduce removes
+// - isins disabled
+// - sources not referenced (all disabled sources are NOT referenced)
 func (cfg *Config) reduce(allSources []string) error {
 
 	// set of (enabled) sources explicitly referenced by isins
@@ -426,21 +429,22 @@ func (cfg *Config) check(allSources []string) error {
 
 // SourceIsinsList ...
 // If no sources, returns a list with zero items (it does not returns nil).
+// NOTE: it assumes all isins and sources are enabled
 func (cfg *Config) SourceIsinsList() []*quote.SourceIsins {
 
 	// build a map from (enabled) source to (enabled) isins
 	sources := map[string][]string{}
 	for _, i := range cfg.Isins {
 		// skip disabled isins
-		if i.Disabled {
-			continue
-		}
+		// if i.Disabled {
+		// 	continue
+		// }
 
 		for _, s := range i.Sources {
 			// skip disabled sources
-			if cfg.Sources[s].Disabled {
-				continue
-			}
+			// if cfg.Sources[s].Disabled {
+			// 	continue
+			// }
 
 			a := sources[s]
 			if a == nil {
