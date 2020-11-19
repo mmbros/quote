@@ -75,6 +75,13 @@ func parseArgSource(sourceWorkers, seps string) (source string, workers int, err
 			goto labelReturnError
 		}
 	}
+
+	// check and normalize
+	if workers == 0 {
+		workers = defaultWorkers
+	} else if workers < 0 {
+		err = fmt.Errorf(errmsgSourceWorkers, source, workers)
+	}
 	return
 
 labelReturnError:
@@ -314,12 +321,26 @@ func (cfg *Config) merge(args *appArgs, allAvailableSources []string) error {
 		for _, s := range cfg.Sources {
 			s.Disabled = true
 		}
+
+		// needed to check sources arguments are unique (fix #11)
+		// NOTE: no need to check isins are unique.
+		mapArgsSourceToWorkers := map[string]int{}
+
 		for _, sw := range args.sources {
 			// split source from workers
 			s, w, err := parseArgSource(sw, sepsSourceWorkers)
 			if err != nil {
 				return err
 			}
+			if precWorkers, ok := mapArgsSourceToWorkers[s]; ok {
+				if precWorkers != w {
+					return fmt.Errorf("duplicate source %q with different number of workers (%d and %d)", s, precWorkers, w)
+				}
+				continue // already inserted
+			} else {
+				mapArgsSourceToWorkers[s] = w
+			}
+
 			enabledSources = append(enabledSources, s)
 
 			source, ok := cfg.Sources[s]

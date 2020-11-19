@@ -503,6 +503,10 @@ func TestIsin(t *testing.T) {
 			cfgtxt: "[isins.isin1]\ndisabled = true\n[isins.isin2]",
 			wants:  "isin1",
 		},
+		"args with isin duplicated": {
+			argtxt: "-i isin1 -i isin1 -s source1",
+			wants:  "isin1",
+		},
 	}
 	for title, c := range cases {
 
@@ -531,15 +535,6 @@ func TestIsin(t *testing.T) {
 func TestSource(t *testing.T) {
 
 	availableSources := []string{"source1", "source2", "source3", "sourceX"}
-
-	// DO NO WORK
-	// "args only explicit duplicate": {
-	// 	argtxt: "-i isin1 --isin isin2 -s source1,source2 --source source1:20",
-	// 	wants: map[string]string{
-	// 		"source1": "isin1,isin2",
-	// 		"source2": "isin1,isin2",
-	// 	},
-	// },
 
 	cases := map[string]struct {
 		argtxt string
@@ -622,6 +617,23 @@ disabled = true
 				"source2": "isin1",
 				"source3": "isin1",
 				"sourceX": "isin1",
+			},
+		},
+		"args with isin duplicated": {
+			argtxt: "-i isin1 -i isin1 -s source1",
+			wants: map[string]string{
+				"source1": "isin1",
+			},
+		},
+		"args with sources duplicated with different workers": {
+			argtxt: "-i isin1 --isins isin2 -s source1,source2 --sources source1:20",
+			errmsg: "duplicate source \"source1\" with different number of workers (1 and 20)",
+		},
+		"args with sources duplicated with no workers": {
+			argtxt: "-i isin1 --isins isin2 -s source1,source2 --sources source1",
+			wants: map[string]string{
+				"source1": "isin1,isin2",
+				"source2": "isin1,isin2",
 			},
 		},
 	}
