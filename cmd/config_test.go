@@ -18,8 +18,9 @@ func TestParseArgSource(t *testing.T) {
 		err     bool
 	}{
 		{
-			input:  "source",
-			source: "source",
+			input:   "source",
+			source:  "source",
+			workers: 1,
 		},
 		{
 			input:   "source:99",
@@ -660,6 +661,46 @@ disabled = true
 					}
 				}
 			}
+		}
+	}
+}
+
+func TestDatabase(t *testing.T) {
+
+	availableSources := []string{"source1"}
+
+	cases := map[string]struct {
+		argtxt string
+		cfgtxt string
+		want   string
+		errmsg string
+	}{
+		"args only": {
+			argtxt: "-i isin1 --database args.db.json",
+			want:   "args.db.json",
+		},
+		"args and config": {
+			argtxt: "-i isin1 --database args.db.json --config-type toml",
+			cfgtxt: `database = "config.db.toml"`,
+			want:   "args.db.json",
+		},
+		"config only": {
+			cfgtxt: `database = "config.db.toml"`,
+			want:   "config.db.toml",
+		}}
+	for title, c := range cases {
+
+		cfg := &Config{}
+		args, err := initAppGetArgs(c.argtxt)
+		require.NoError(t, err)
+		err = cfg.auxGetConfig([]byte(c.cfgtxt), args, availableSources)
+
+		if c.errmsg != "" {
+			if assert.Error(t, err, title) {
+				assert.Contains(t, err.Error(), c.errmsg, title)
+			}
+		} else {
+			assert.Equal(t, c.want, cfg.Database, title)
 		}
 	}
 }
