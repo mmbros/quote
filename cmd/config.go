@@ -26,14 +26,12 @@ const (
 )
 
 type sourceItem struct {
-	Source   string `json:"source,omitempty"`
 	Workers  int    `json:"workers,omitempty"`
 	Proxy    string `json:"proxy,omitempty"`
 	Disabled bool   `json:"disabled,omitempty"`
 }
 
 type isinItem struct {
-	Isin     string   `json:"isin,omitempty"`
 	Name     string   `json:"name,omitempty"`
 	Disabled bool     `json:"disabled,omitempty"`
 	Sources  []string `json:"sources,omitempty"`
@@ -180,7 +178,6 @@ func (cfg *Config) addAllSources(allSources []string, disabled bool) {
 		if source == nil {
 			// add new source
 			cfg.Sources[s] = &sourceItem{
-				Source:   s,
 				Disabled: disabled,
 			}
 		}
@@ -210,17 +207,14 @@ func (cfg *Config) normalizeVars() {
 			v = &isinItem{}
 			cfg.Isins[k] = v
 		}
-		if v.Isin == "" {
-			v.Isin = k
-		}
 	}
 	for k, v := range cfg.Sources {
 		if v == nil {
+			// sources:
+			//   source1:
+			//     # nothing
 			v = &sourceItem{}
 			cfg.Sources[k] = v
-		}
-		if v.Source == "" {
-			v.Source = k
 		}
 	}
 }
@@ -297,7 +291,6 @@ func (cfg *Config) merge(args *appArgs, allAvailableSources []string) error {
 				item.Disabled = false
 			} else {
 				item = &isinItem{
-					Isin:    i,
 					Sources: allAvailableSources,
 				}
 				cfg.Isins[i] = item
@@ -353,7 +346,6 @@ func (cfg *Config) merge(args *appArgs, allAvailableSources []string) error {
 			} else {
 				// add new source
 				source = &sourceItem{
-					Source:  s,
 					Workers: w, // if 0, will be overwrite
 				}
 				cfg.Sources[s] = source
@@ -429,7 +421,7 @@ func (cfg *Config) check(allSources []string) error {
 
 		// check workers
 		if source.Workers < 0 {
-			return fmt.Errorf(errmsgSourceWorkers, source.Source, source.Workers)
+			return fmt.Errorf(errmsgSourceWorkers, s, source.Workers)
 		}
 		if source.Workers == 0 {
 			source.Workers = cfg.Workers
@@ -455,13 +447,13 @@ func (cfg *Config) SourceIsinsList() []*quote.SourceIsins {
 
 	// build a map from (enabled) source to (enabled) isins
 	sources := map[string][]string{}
-	for _, i := range cfg.Isins {
+	for i, isin := range cfg.Isins {
 		// skip disabled isins
 		// if i.Disabled {
 		// 	continue
 		// }
 
-		for _, s := range i.Sources {
+		for _, s := range isin.Sources {
 			// skip disabled sources
 			// if cfg.Sources[s].Disabled {
 			// 	continue
@@ -469,9 +461,9 @@ func (cfg *Config) SourceIsinsList() []*quote.SourceIsins {
 
 			a := sources[s]
 			if a == nil {
-				a = []string{i.Isin}
+				a = []string{i}
 			} else {
-				a = append(a, i.Isin)
+				a = append(a, i)
 			}
 			sources[s] = a
 		}
