@@ -75,7 +75,7 @@ Prints list of available sources.
 
 func initCommandGet(args *appArgs) *simpleflag.Command {
 
-	opts := []*simpleflag.Option{
+	flags := []*simpleflag.Flag{
 		{Value: &args.config, Names: "c,config"},
 		{Value: &args.configType, Names: "config-type"},
 		{Value: &args.database, Names: "d,database"},
@@ -87,25 +87,25 @@ func initCommandGet(args *appArgs) *simpleflag.Command {
 	}
 
 	cmd := &simpleflag.Command{
-		Names:   "get,g",
-		Usage:   usageGet,
-		Options: opts,
+		Names: "get,g",
+		Usage: usageGet,
+		Flags: flags,
 	}
 	return cmd
 }
 
 func initCommandTor(args *appArgs) *simpleflag.Command {
 
-	opts := []*simpleflag.Option{
+	flags := []*simpleflag.Flag{
 		{Value: &args.config, Names: "c,config"},
 		{Value: &args.configType, Names: "config-ype"},
 		{Value: &args.proxy, Names: "p,proxy"},
 	}
 
 	cmd := &simpleflag.Command{
-		Names:   "tor,t",
-		Usage:   usageTor,
-		Options: opts,
+		Names: "tor,t",
+		Usage: usageTor,
+		Flags: flags,
 	}
 	return cmd
 }

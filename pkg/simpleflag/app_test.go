@@ -45,7 +45,7 @@ Options:
   -s, --sources strings   list of sources to get the quotes from
   -w, --workers int       number of workers (default 1)
 `,
-				Options: []*Option{
+				Flags: []*Flag{
 					{&opts.isins, "i,isin"},
 					{&opts.sources, "s,sources"},
 					{&opts.config, "c,config"},
@@ -62,7 +62,7 @@ Options:
   -c, --config path    config file (default is $HOME/.quote.yaml)
   -p, --proxy url      proxy to test the Tor network
 `,
-				Options: []*Option{
+				Flags: []*Flag{
 					{&opts.config, "c,config"},
 					{&opts.proxy, "p,proxy"},
 				},

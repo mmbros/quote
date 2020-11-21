@@ -1,17 +1,19 @@
+// Copyright 2020 MMbros <server.mmbros@yandex.com>.
+// Use of this source code is governed by Apache License.
+
 /*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
+quote is a command line utility that retrieves stock/fund quotes from
+various sources.
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
+  quote <sub-command>
 
-    http://www.apache.org/licenses/LICENSE-2.0
+Available sub-commands are:
 
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
+  get      Get the quotes of the specified isins
+  sources  Show available sources
+  tor      Checks if Tor network will be used
+
+
 */
 package main
 
