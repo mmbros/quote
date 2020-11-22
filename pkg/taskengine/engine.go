@@ -1,3 +1,23 @@
+// Package taskengine can be used to concurrently execute a set of tasks
+// assigned to multiple different workers.
+//
+// A Task represents a unit of work to be executed.
+// Each task can be assigned to one or more workers.
+// Two tasks are considered equivalent if they have the same TaskID.
+// Note that tasks with the same TaskID can be different object with different information;
+// this allows a task object assigned to a worker to contain information specific to that worker.
+//
+// Each Worker has a WorkFunc that performs the task.
+// Multiple instances of the same worker can be used to concurrently execute
+// different tasks assign to the  worker.
+//
+// The execution mode of the task is managed by the engine.Mode parameters:
+//
+// - FirstSuccessOrLastError: For each task it returns only one result: the first success or the last error. If a task can be handled by two or more workers, only the first success result is returned. The remaining job for same task are skipped.
+//
+// - FirstSuccessThenCancel: For each task returns the (not successfull) result of all the workers: after the first success the other requests are cancelled.
+//
+// - All: For each task returns the result of all the workers. Multiple success results can be returned.
 package taskengine
 
 import (
@@ -6,7 +26,7 @@ import (
 	"sync"
 )
 
-// Mode of execution for each task
+// Mode of execution for each task.
 type Mode int
 
 // Values of engine mode execution for each task
@@ -25,16 +45,16 @@ const (
 	All
 )
 
-// Engine is ...
+// Engine contains the workers and the taks of each worker.
 type Engine struct {
 	workers map[WorkerID]*Worker
 	tasks   WorkerTasks // map[WorkerID]*Tasks
 	tidctxs map[TaskID]*taskIDContext
 }
 
-// taskIDContext contains the information common to all the task with the same TaskID.
-// Note: the Task itself cannot be here, because different task with the same TaskID
-//       can have different information.
+// taskIDContext contains the information common to all the tasks with the same TaskID.
+// NOTE: the Task itself cannot be here, because
+//       different tasks with the same TaskID can have different information.
 type taskIDContext struct {
 	taskID TaskID
 
@@ -51,13 +71,14 @@ type taskIDContext struct {
 	resChan chan Result
 }
 
+// workerRequest struct collect the informations useful to execute a specific task.
 type workerRequest struct {
 	ctx context.Context
 
 	// task of the worker
 	task Task
 
-	// response channel for the specific taskid
+	// response channel for the specific TaskID
 	resChan chan Result
 }
 
