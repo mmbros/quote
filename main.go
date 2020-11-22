@@ -2,17 +2,17 @@
 // Use of this source code is governed by Apache License.
 
 /*
-quote is a command line utility that retrieves stock/fund quotes from
-various sources.
+Command quote is an utility that retrieves stock/fund quotes from various sources.
 
-  quote <sub-command>
+Usage:
+
+    quote <sub-command>
 
 Available sub-commands are:
 
-  get      Get the quotes of the specified isins
-  sources  Show available sources
-  tor      Checks if Tor network will be used
-
+    get      Get the quotes of the specified isins
+    sources  Show available sources
+    tor      Checks if Tor network will be used
 
 */
 package main
