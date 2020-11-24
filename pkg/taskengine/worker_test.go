@@ -406,3 +406,54 @@ func TestExecuteError(t *testing.T) {
 		t.Errorf("Expecting nil chan, got not nil")
 	}
 }
+
+func TestExecuteAllCancelContext(t *testing.T) {
+	workers := []*Worker{
+		{"w1", 1, workFn},
+		{"w2", 1, workFn},
+		{"w3", 1, workFn},
+	}
+
+	type testCase struct {
+		input    map[string][]testCaseTask
+		expected simpleResults
+	}
+
+	testCases := map[string]testCase{
+		"all ok": {
+			input: map[string][]testCaseTask{
+				"w1": {{"t1", 320, true}},
+				"w2": {{"t1", 310, true}},
+				"w3": {{"t1", 300, true}},
+			},
+			expected: simpleResults{
+				{"t1", "w3", true},
+				{"t1", "w2", true},
+				{"t1", "w1", true},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+
+		tasks := newTestWorkeridTasks(t, tc.input)
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		out, err := Execute(ctx, workers, tasks, All)
+
+		if err != nil {
+			t.Fatalf("Unexpected error: %v", err)
+		}
+
+		// why nil? I would expect "deadline exceeded"
+		t.Logf("ctx.Err = %v", ctx.Err())
+
+		for r := range out {
+			res := r.(*testResult)
+			if res.err != context.DeadlineExceeded {
+				t.Errorf("Expecting error %q, got %q", context.DeadlineExceeded, res.err)
+			}
+		}
+
+	}
+}

@@ -224,12 +224,17 @@ func getAllResults(tidctx *taskIDContext, out chan Result) {
 
 	for ; count > 0; count-- {
 
-		select {
-		case res := <-tidctx.resChan:
-			out <- res
-		case <-tidctx.ctx.Done():
-			tidctx.cancel()
-		}
+		// Modified to always returns the results, eventuallly with error.
+		//
+		// select {
+		// case res := <-tidctx.resChan:
+		// 	out <- res
+		// case <-tidctx.ctx.Done():
+		// 	tidctx.cancel()
+		// }
+		res := <-tidctx.resChan
+		out <- res
+
 	}
 }
 
