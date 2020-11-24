@@ -396,3 +396,13 @@ func TestExecuteAll(t *testing.T) {
 		}
 	}
 }
+
+func TestExecuteError(t *testing.T) {
+	ch, err := Execute(nil, nil, nil, All)
+	if err == nil {
+		t.Errorf("Expecting error, got no error")
+	}
+	if ch != nil {
+		t.Errorf("Expecting nil chan, got not nil")
+	}
+}

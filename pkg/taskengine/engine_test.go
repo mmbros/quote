@@ -107,3 +107,15 @@ func TestNewEngine(t *testing.T) {
 		}
 	}
 }
+
+func TestEngineExecuteNilEngine(t *testing.T) {
+	var eng *Engine
+	_, err := eng.Execute(All)
+	if err == nil {
+		t.Fatal("Expecting error, got no error")
+	}
+	errmsg := "engine is nil"
+	if err.Error() != errmsg {
+		t.Errorf("Expecting error %q, got error %q", errmsg, err)
+	}
+}
