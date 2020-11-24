@@ -19,7 +19,7 @@ func TestNewEngineNilContext(t *testing.T) {
 
 	tasks := newTestWorkeridTasks(t, input)
 	_, err := NewEngine(nil, workers, tasks)
-	expected := errors.New("Nil context")
+	expected := errors.New("nil context")
 
 	if err == nil {
 		t.Errorf("Expected error %q, found no error", expected)
@@ -44,7 +44,7 @@ func TestNewEngine(t *testing.T) {
 				{"w1", 3, workFn},
 			},
 			input: map[string][]testCaseTask{},
-			err:   errors.New("Duplicate worker: WorkerID=\"w1\""),
+			err:   errors.New("duplicate worker: WorkerID=\"w1\""),
 		},
 		"instances < 1": {
 			workers: []*Worker{
@@ -53,7 +53,7 @@ func TestNewEngine(t *testing.T) {
 				{"w3", 0, workFn},
 			},
 			input: map[string][]testCaseTask{},
-			err:   errors.New("Instances must be in 1..100 range: WorkerID=\"w3\""),
+			err:   errors.New("instances must be in 1..100 range: WorkerID=\"w3\""),
 		},
 		"instances > 100": {
 			workers: []*Worker{
@@ -62,7 +62,7 @@ func TestNewEngine(t *testing.T) {
 				{"w3", 101, workFn},
 			},
 			input: map[string][]testCaseTask{},
-			err:   errors.New("Instances must be in 1..100 range: WorkerID=\"w3\""),
+			err:   errors.New("instances must be in 1..100 range: WorkerID=\"w3\""),
 		},
 		"ko work function": {
 			workers: []*Worker{
@@ -71,7 +71,7 @@ func TestNewEngine(t *testing.T) {
 				{"w3", 3, workFn},
 			},
 			input: map[string][]testCaseTask{},
-			err:   errors.New("Work function cannot be nil: WorkerID=\"w2\""),
+			err:   errors.New("work function cannot be nil: WorkerID=\"w2\""),
 		},
 		"undefined worker": {
 			workers: []*Worker{
@@ -84,7 +84,7 @@ func TestNewEngine(t *testing.T) {
 				"w000": {{"t3", 10, true}},
 				"w2":   {{"t3", 20, true}, {"t2", 10, true}},
 			},
-			err: errors.New("Tasks for undefined worker: WorkerID=\"w000\""),
+			err: errors.New("tasks for undefined worker: WorkerID=\"w000\""),
 		},
 	}
 

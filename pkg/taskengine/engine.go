@@ -87,20 +87,20 @@ type workerRequest struct {
 func NewEngine(ctx context.Context, ws []*Worker, wts WorkerTasks) (*Engine, error) {
 
 	if ctx == nil {
-		return nil, fmt.Errorf("Nil context")
+		return nil, fmt.Errorf("nil context")
 	}
 
 	// check workers and build a map from workerid to Worker
 	workers := map[WorkerID]*Worker{}
 	for _, w := range ws {
 		if _, ok := workers[w.WorkerID]; ok {
-			return nil, fmt.Errorf("Duplicate worker: WorkerID=%q", w.WorkerID)
+			return nil, fmt.Errorf("duplicate worker: WorkerID=%q", w.WorkerID)
 		}
 		if w.Instances <= 0 || w.Instances > maxInstances {
-			return nil, fmt.Errorf("Instances must be in 1..%d range: WorkerID=%q", maxInstances, w.WorkerID)
+			return nil, fmt.Errorf("instances must be in 1..%d range: WorkerID=%q", maxInstances, w.WorkerID)
 		}
 		if w.Work == nil {
-			return nil, fmt.Errorf("Work function cannot be nil: WorkerID=%q", w.WorkerID)
+			return nil, fmt.Errorf("work function cannot be nil: WorkerID=%q", w.WorkerID)
 		}
 		workers[w.WorkerID] = w
 	}
@@ -114,7 +114,7 @@ func NewEngine(ctx context.Context, ws []*Worker, wts WorkerTasks) (*Engine, err
 		// for not empty task lists, check the worker exists
 		if len(ts) > 0 {
 			if _, ok := workers[wid]; !ok {
-				return nil, fmt.Errorf("Tasks for undefined worker: WorkerID=%q", wid)
+				return nil, fmt.Errorf("tasks for undefined worker: WorkerID=%q", wid)
 			}
 			// save the task list of the worker in the engine
 			tasks[wid] = ts
@@ -237,7 +237,7 @@ func getAllResults(tidctx *taskIDContext, out chan Result) {
 func (eng *Engine) Execute(mode Mode) (chan Result, error) {
 
 	if eng == nil {
-		return nil, fmt.Errorf("Engine is nil")
+		return nil, fmt.Errorf("engine is nil")
 	}
 
 	//
