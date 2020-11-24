@@ -1,16 +1,33 @@
 # taskengine
 
 Package `taskengine` can be used to concurrently execute a set of tasks assigned to multiple different workers.
+used
 
+The main types defined by the package are:
+- Engine
+- Task
+- Worker
+- WorkerTasks
 
-The `NewEngine` function initialize a new `engine` object from the list of workers and the tasks of each worker.
+## Engine
+
+The `NewEngine` function initialize a new `Engine` object given the list of workers and the tasks of each worker.
 
     func NewEngine(ctx context.Context, ws []*Worker, wts WorkerTasks) (*Engine, error)
-    
-`WorkerTasks` is a map representing the tasks list of each worker.
 
-    type WorkerTasks map[WorkerID]Tasks
 
+The `Execute` method of the engine object returns a chan in which are enqueued the workers results for the input tasks. 
+
+    func (eng *Engine) Execute(mode Mode) (chan Result, error)
+
+The `Mode` enum type represents the mode of execution:
+
+- `FirstSuccessOrLastError`: for each task it returns only one result: the first success or the last error. If a task can be handled by two or more workers, only the first success result is returned. The remaining job for same task are cancelled.
+- `FirstSuccessThenCancel`: for each task it returns the error results preceding the first success and the first success. The remaining job for the same task are cancelled.
+- `All`: for each task returns the result of all the workers. Multiple success results can be returned.
+	
+
+## Task
 
 A `Task` represents a unit of work to be executed. Each task can be assigned to one or more workers. Two tasks are considered equivalent if they have the same `TaskID`.  
 **NOTE:** tasks with the same TaskID can be different object with different information; this allows a task object assigned to a worker to contain information specific to that worker. 
@@ -18,6 +35,8 @@ A `Task` represents a unit of work to be executed. Each task can be assigned to 
     type Task interface {
         TaskID() TaskID      // Unique ID of the task
     }
+
+## Worker
 
 Each `Worker` has a `WorkFunc` that performs the task. Multiple instances of the same worker can be used in order to execute concurrently different tasks assign to the  worker.  
 
@@ -32,20 +51,17 @@ The `WorkFunc` receives in input a `context`, the instance number of the worker 
     type WorkFunc func(context.Context, int, Task) Result
 
 
-The `Result` interface has just the `Success` method that must returns true in case of success.
+The `Result` interface has only the `Success` method that must returns true in case of success and false otherwise.
 
     type Result interface {
         Success() bool
     }
 
 
-The `engine.Execute` function returns a chan in which are enqueued the workers results for the input tasks. 
+## WorkerTasks
 
-    func (eng *Engine) Execute(mode Mode) (chan Result, error)
+`WorkerTasks` type is a map that contains the tasks list of each WorkerID.
 
-The `Mode` enum type represents the mode of execution:
+    type WorkerTasks map[WorkerID]Tasks
 
-- `FirstSuccessOrLastError`: For each task it returns only one result: the first success or the last error. If a task can be handled by two or more workers, only the first success result is returned. The remaining job for same task are skipped.
-- `FirstSuccessThenCancel`: For each task returns the (not successfull) result of all the workers: after the first success the other requests are cancelled.
-- `All`: For each task returns the result of all the workers. Multiple success results can be returned.
-	
+The `SortTasks` method reorder each worker tasks list, in order to have a worker handle each task as soon as possible.

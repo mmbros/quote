@@ -2,40 +2,58 @@ package taskengine
 
 import "sort"
 
-// SortTasks reorder each worker tasks list, to handle globally each task as soon as possible.
+// SortTasks  reorder each worker tasks list,
+// in order to have a worker handle each task as soon as possible.
+//
+// The algorithm is as follows.
+//
+// Until there are tasks left, loop over each worker and for each worker:
+//
+// 1. if it remains just one task in the worker list, take that
+//
+// 2. otherwise selects the task for which there are fewer workers left to assign it.
+// Note that only the workers following the current one are considered
+//
+// 3. if multiple tasks meet the above criteria,
+// select the task that has fewer workers that already have the task in the list
+//
+// 4. if multiple tasks meet the above criteria,
+// select the task with the smallest TaskID.
+// Note: used to make the algorithm deterministic.
 func (wts WorkerTasks) SortTasks() {
-	// obiettivo:
-	//   per ogni worker ordinare i task in modo che ogni task sia globalmente gestito il prima possibile
-	// ipotesi:
-	//   tutti i task di un singolo worker sono distinti (TODO: VERIFICARE SE NECESSARIA)
-	// strategia:
-	//   ciclo sui worker. per ogni worker
-	//   1. prendo il task con meno worker che l'hanno gia' assegnato
-	//   2. a parita' del punto 1, prendo il task per cui rimangono meno worker
-	//   3. a parita' del punto 2, prendo il task che ha meno worker gia' assegnati
-	//   4. a parita' del punto 3, prendo il task con ID piu' piccolo (per rendere deterministico l'algoritmo)
-
 	wtsCloned := wts.Clone()
 
-	// initialize the WorkerTaks result and the array of wids
+	// WorkerTaks result
 	res := WorkerTasks{}
-	doneMap := map[TaskID]int{}
+
+	// The array of WorkerID
 	wids := make([]WorkerID, 0, len(wtsCloned))
+
+	// How many workers already have the TaskID assigned in the res object.
+	doneMap := map[TaskID]int{}
+
+	// Total number of tasks.
+	// The same task is counted more times if assigned to different workers.
+	// The loop below is repeated until this counter is zero.
 	countTasks := 0
+
 	for w, ts := range wtsCloned {
 		res[w] = Tasks{}
 		wids = append(wids, w)
 		countTasks += len(ts)
 	}
 
-	// sort the slice in order to be deterministic (for test pourposes)
+	// Sort the slice in order to be deterministic (for test pourposes)
 	sort.Slice(wids, func(i, j int) bool {
 		return wids[i] < wids[j]
 	})
 
 	for countTasks > 0 {
 
+		// Inner loop over each worker
 		for jw, wid := range wids {
+
+			// Get the remaining tasks of the worker
 			ts := wtsCloned[wid]
 			if len(ts) == 0 {
 				continue
@@ -50,7 +68,8 @@ func (wts WorkerTasks) SortTasks() {
 			for idx, t := range ts {
 				tid := t.TaskID()
 
-				// count: conta fra i worker successivi quanti worker possono gestire il task
+				// count: how many workers, among the following workers,
+				// can manage the task
 				count := 0
 				for j := jw + 1; j < len(wids); j++ {
 					jwid := wids[j]
@@ -60,7 +79,8 @@ func (wts WorkerTasks) SortTasks() {
 						}
 					}
 				}
-				// done: quanti worker hanno gia' il task nella lista
+
+				// done: how many workers already have the task in the list
 				done := doneMap[tid]
 
 				if first ||
@@ -75,7 +95,7 @@ func (wts WorkerTasks) SortTasks() {
 				}
 			}
 
-			// aggiorna le variabili
+			// updates variables
 			doneMap[mintid] = mindone + 1
 			res[wid] = append(res[wid], ts[minidx])
 			countTasks--
@@ -88,7 +108,7 @@ func (wts WorkerTasks) SortTasks() {
 		}
 	}
 
-	// update wts each worker task lists
+	// update the current wts object with the result
 	for wid := range wts {
 		wts[wid] = res[wid]
 	}
