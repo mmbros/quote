@@ -49,6 +49,18 @@ func TestSortTasksByLessWorkers(t *testing.T) {
 				"w3": T("t3", "t1", "t2"),
 			},
 		},
+		"almost same T for all W": {
+			input: WorkerTasks{
+				"w1": T("t1", "t2"),
+				"w2": T("t1", "t2", "t3"),
+				"w3": T("t1", "t2", "t3"),
+			},
+			want: WorkerTasks{
+				"w1": T("t1", "t2"),
+				"w2": T("t2", "t3", "t1"),
+				"w3": T("t3", "t1", "t2"),
+			},
+		},
 		"test case 3": {
 			input: WorkerTasks{
 				"w1": T("t3", "t2"),
