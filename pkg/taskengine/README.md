@@ -2,6 +2,9 @@
 
 Package `taskengine` can be used to concurrently execute a set of tasks assigned to multiple different workers.
 
+Each worker can works all or a subset of the tasks.  
+The workers tasks can be automatically reordered to have each task be handled by a worker as soon as possible.
+
 The main types defined by the package are:
 - Engine
 - Task
@@ -63,4 +66,14 @@ The `Result` interface has only the `Success` method that must returns true in c
 
     type WorkerTasks map[WorkerID]Tasks
 
-The `SortTasks` method reorder each worker tasks list, in order to have a worker handle each task as soon as possible.
+The `SortTasks` method reorder each worker tasks list to have each task be handled by a worker as soon as possible. For example given the following configuration:
+
+    worker1: [task1, task2]
+    worker2: [task1, task2, task3]
+    worker3: [task1, task2, task3]
+
+`SortTask` method would give:
+
+    worker1: [task1, task2]
+    worker2: [task2, task3, task1]
+    worker3: [task3, task1, task2]
