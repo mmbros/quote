@@ -1,7 +1,6 @@
 # taskengine
 
 Package `taskengine` can be used to concurrently execute a set of tasks assigned to multiple different workers.
-used
 
 The main types defined by the package are:
 - Engine
