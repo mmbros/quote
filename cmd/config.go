@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/mmbros/quote/internal/quote"
+	"github.com/mmbros/quote/pkg/taskengine"
 	toml "github.com/pelletier/go-toml"
 	"gopkg.in/yaml.v3"
 )
@@ -45,6 +46,9 @@ type Config struct {
 	Proxies  map[string]string      `json:"proxies,omitempty"`
 	Sources  map[string]*sourceItem `json:"sources,omitempty"`
 	Isins    map[string]*isinItem   `json:"isins,omitempty"`
+	Mode     string                 `json:"mode,omitempty"`
+
+	mode taskengine.Mode
 }
 
 // String returns a json string representation of the object.
@@ -275,6 +279,14 @@ func (cfg *Config) merge(args *appArgs, allAvailableSources []string) error {
 		cfg.Proxy = args.proxy.Value
 	}
 
+	// Mode
+	if args.mode.Passed {
+		cfg.Mode = args.mode.Value
+	}
+	if cfg.Mode == "" {
+		cfg.Mode = defaultMode
+	}
+
 	// Isins
 	//
 	// If passed, only isins in args are getted
@@ -408,7 +420,28 @@ func (cfg *Config) reduce(allSources []string) error {
 	return nil
 }
 
+func (cfg *Config) checkAndSetMode() error {
+	var m taskengine.Mode
+
+	switch strings.ToUpper(cfg.Mode) {
+	case "1", "FIRSTSUCCESSORLASTERROR":
+		m = taskengine.FirstSuccessOrLastError
+	case "S", "FIRSTSUCCESSTHENCANCEL":
+		m = taskengine.FirstSuccessThenCancel
+	case "A", "ALL":
+		m = taskengine.All
+	default:
+		return fmt.Errorf("invalid mode %q", cfg.Mode)
+	}
+	cfg.mode = m
+	return nil
+}
+
 func (cfg *Config) check(allSources []string) error {
+
+	if err := cfg.checkAndSetMode(); err != nil {
+		return err
+	}
 
 	setOfAllSources := newSet(allSources)
 

@@ -12,6 +12,7 @@ import (
 
 const (
 	defaultConfigType = "yaml"
+	defaultMode       = "1"
 )
 
 type appArgs struct {
@@ -23,6 +24,7 @@ type appArgs struct {
 	proxy      simpleflag.String
 	sources    simpleflag.Strings
 	workers    simpleflag.Int
+	mode       simpleflag.String
 }
 
 const (
@@ -39,14 +41,17 @@ Available Commands:
 
 Options:
     -c, --config      path     config file (default is $HOME/.quote.yaml)
-		--config-type string   used if config file does not have the extension in the name;
-		                       accepted values are: YAML, TOML and JSON 
+        --config-type string   used if config file does not have the extension in the name;
+                               accepted values are: YAML, TOML and JSON 
     -i, --isins       strings  list of isins to get the quotes
     -n, --dry-run              perform a trial run with no request/updates made
     -p, --proxy       url      default proxy
     -s, --sources     strings  list of sources to get the quotes from
     -w, --workers     int      number of workers (default 1)
     -d, --database    dns      sqlite3 database used to save the quotes
+    -m, --mode        char     result mode: "1" first success or last error (default)
+                                            "S" all errors until first success 
+                                            "A" all 
 `
 
 	usageTor = `Usage:
@@ -84,6 +89,7 @@ func initCommandGet(args *appArgs) *simpleflag.Command {
 		{Value: &args.proxy, Names: "p,proxy"},
 		{Value: &args.sources, Names: "s,sources"},
 		{Value: &args.workers, Names: "w,workers"},
+		{Value: &args.mode, Names: "m,mode"},
 	}
 
 	cmd := &simpleflag.Command{
@@ -163,13 +169,16 @@ func execGet(args *appArgs, cfg *Config) error {
 		if cfg.Database != "" {
 			fmt.Printf("Database: %q\n", cfg.Database)
 		}
+		if cfg.Mode != "" {
+			fmt.Printf("Mode: %q\n", cfg.Mode)
+		}
 		fmt.Println("Tasks:", jsonString(sis))
 
 		return nil
 	}
 
 	// do retrieves the quotes
-	return quote.Get(sis, cfg.Database)
+	return quote.Get(sis, cfg.Database, cfg.mode)
 }
 
 func execSources(args *appArgs, cfg *Config) error {

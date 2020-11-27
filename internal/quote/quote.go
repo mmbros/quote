@@ -130,10 +130,13 @@ func checkListOfSourceIsins(items []*SourceIsins) error {
 	return nil
 }
 
-// Get is ...
-func Get(items []*SourceIsins, dbpath string) error {
+// Get retrieves the quotes specified by the SourceIsins object.
+// The mode parameters specified the taskengine mode of execution.
+// The results quotes are printed in json format.
+// The quotes are also saved to the database, if the dbpath is given.
+func Get(items []*SourceIsins, dbpath string, mode taskengine.Mode) error {
 
-	results, err := getResults(items, taskengine.FirstSuccessOrLastError)
+	results, err := getResults(items, mode)
 	if err != nil {
 		return err
 	}

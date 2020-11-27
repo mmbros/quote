@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mmbros/quote/internal/quote"
+	"github.com/mmbros/quote/pkg/taskengine"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -701,6 +702,93 @@ func TestDatabase(t *testing.T) {
 			}
 		} else {
 			assert.Equal(t, c.want, cfg.Database, title)
+		}
+	}
+}
+
+func TestMode(t *testing.T) {
+
+	availableSources := []string{"source1", "source2", "source3"}
+
+	cases := map[string]struct {
+		argtxt string
+		cfgtxt string
+		want   taskengine.Mode
+		errmsg string
+	}{
+		"args no mode": {
+			argtxt: "-i isin1",
+			want:   taskengine.FirstSuccessOrLastError,
+		},
+		"args 1": {
+			argtxt: "-i isin1 -m 1",
+			want:   taskengine.FirstSuccessOrLastError,
+		},
+		"args FirstSuccessOrLastError": {
+			argtxt: "-i isin1 -m FirstSuccessOrLastError",
+			want:   taskengine.FirstSuccessOrLastError,
+		},
+		"args FirstSuccessThenCancel": {
+			argtxt: "-i isin1 -m FIRSTSUCCESSTHENCANCEL",
+			want:   taskengine.FirstSuccessThenCancel,
+		},
+		"args S": {
+			argtxt: "-i isin1 -m S",
+			want:   taskengine.FirstSuccessThenCancel,
+		},
+		"args s": {
+			argtxt: "-i isin1 -m s",
+			want:   taskengine.FirstSuccessThenCancel,
+		},
+		"args A": {
+			argtxt: "-i isin1 -m A",
+			want:   taskengine.All,
+		},
+		"args All": {
+			argtxt: "-i isin1 -m All",
+			want:   taskengine.All,
+		},
+		"args a": {
+			argtxt: "-i isin1 -m a",
+			want:   taskengine.All,
+		},
+		"args error": {
+			argtxt: "-i isin1 -m s1",
+			errmsg: "invalid mode",
+		},
+		"cfg only": {
+			cfgtxt: `mode: A
+isins:
+  isin1:
+`,
+			want: taskengine.All,
+		},
+		"args no mode + cfg": {
+			argtxt: "-i isin1",
+			cfgtxt: `mode: A`,
+			want:   taskengine.All,
+		},
+		"args with mode + cfg": {
+			argtxt: "-i isin1 -m s",
+			cfgtxt: `mode: A`,
+			want:   taskengine.FirstSuccessThenCancel,
+		},
+	}
+	for title, c := range cases {
+
+		cfg := &Config{}
+		args, err := initAppGetArgs(c.argtxt)
+		require.NoError(t, err)
+		err = cfg.auxGetConfig([]byte(c.cfgtxt), args, availableSources)
+
+		if c.errmsg != "" {
+			if assert.Error(t, err, title) {
+				assert.Contains(t, err.Error(), c.errmsg, title)
+			}
+		} else {
+			if assert.NoError(t, err, title) {
+				assert.Equal(t, c.want, cfg.mode, title)
+			}
 		}
 	}
 }

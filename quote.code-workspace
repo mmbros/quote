@@ -8,6 +8,13 @@
 	"launch": {
 		"version": "0.2.0",
 		"configurations": [		
+		{
+			"name": "Launch Chrome",
+			"request": "launch",
+			"type": "pwa-chrome",
+			"url": "http://localhost:8080",
+			"webRoot": "${workspaceFolder}"
+		},
 		
 
 			{
@@ -69,7 +76,7 @@
 				"mode": "auto",
 				"program": "${workspaceFolder}/main.go",
 				"env": {},
-				"args": ["g",  "-i", "BTC", "-s", "cryptonatorcom-EUR"]
+				"args": ["g", "-n", "-i", "BTC", "-s", "cryptonatorcom-EUR"]
 			}
 		]
 	}
