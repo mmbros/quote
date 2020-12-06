@@ -37,7 +37,7 @@ const (
 	// For each task returns the result of all the workers:
 	// after the first success the other requests are cancelled.
 	// At most one success is expected.
-	FirstSuccessThenCancel
+	UntilFirstSuccess
 
 	// For each task returns the result of all the workers.
 	// Multiple success results can be returned.
@@ -288,7 +288,7 @@ func (eng *Engine) Execute(mode Mode) (chan Result, error) {
 						// - it is completed and no success was found
 						resultc <- o.res
 					}
-				case FirstSuccessThenCancel:
+				case UntilFirstSuccess:
 					if success {
 						// call cancel func for the task context
 						taskcancel[tid]()

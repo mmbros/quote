@@ -729,16 +729,16 @@ func TestMode(t *testing.T) {
 			want:   taskengine.FirstSuccessOrLastError,
 		},
 		"args FirstSuccessThenCancel": {
-			argtxt: "-i isin1 -m FIRSTSUCCESSTHENCANCEL",
-			want:   taskengine.FirstSuccessThenCancel,
+			argtxt: "-i isin1 -m UNTILFIRSTSUCCESS",
+			want:   taskengine.UntilFirstSuccess,
 		},
 		"args S": {
-			argtxt: "-i isin1 -m S",
-			want:   taskengine.FirstSuccessThenCancel,
+			argtxt: "-i isin1 -m U",
+			want:   taskengine.UntilFirstSuccess,
 		},
 		"args s": {
-			argtxt: "-i isin1 -m s",
-			want:   taskengine.FirstSuccessThenCancel,
+			argtxt: "-i isin1 -m u",
+			want:   taskengine.UntilFirstSuccess,
 		},
 		"args A": {
 			argtxt: "-i isin1 -m A",
@@ -769,9 +769,9 @@ isins:
 			want:   taskengine.All,
 		},
 		"args with mode + cfg": {
-			argtxt: "-i isin1 -m s",
+			argtxt: "-i isin1 -m u",
 			cfgtxt: `mode: A`,
-			want:   taskengine.FirstSuccessThenCancel,
+			want:   taskengine.UntilFirstSuccess,
 		},
 	}
 	for title, c := range cases {

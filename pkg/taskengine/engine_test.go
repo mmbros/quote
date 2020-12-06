@@ -323,7 +323,7 @@ func Test3ExecuteUntilFirstSuccess(t *testing.T) {
 		},
 	}
 
-	mode := FirstSuccessThenCancel
+	mode := UntilFirstSuccess
 	ctx := context.Background()
 	copts := cmp.Options{
 		cmpopts.SortSlices(testCaseResultLess),
