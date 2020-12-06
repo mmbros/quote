@@ -1,7 +1,11 @@
 package taskengine
 
 import (
+	"bytes"
 	"context"
+	"fmt"
+	"sort"
+	"strings"
 )
 
 // Max number of instances for each worker
@@ -74,8 +78,6 @@ func (wts WorkerTasks) Clone() WorkerTasks {
 	return wts2
 }
 
-/*
-
 // String representation of a Tasks object
 func (ts Tasks) String() string {
 	a := make([]string, 0, len(ts))
@@ -106,7 +108,6 @@ func (wts WorkerTasks) String() string {
 	// buffer to string
 	return buf.String()
 }
-*/
 
 // Execute function returns a chan that receives the Results of the workers for the input Requests.
 func Execute(ctx context.Context, workers []*Worker, tasks WorkerTasks, mode Mode) (chan Result, error) {

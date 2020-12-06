@@ -1,8 +1,11 @@
 package taskengine
 
-import "sort"
+import (
+	"math/rand"
+	"sort"
+)
 
-// SortTasks  reorder each worker tasks list,
+// SortTasks reorder each worker tasks list,
 // in order to have a worker handle each task as soon as possible.
 //
 // The algorithm is as follows.
@@ -113,4 +116,16 @@ func (wts WorkerTasks) SortTasks() {
 		wts[wid] = res[wid]
 	}
 
+}
+
+// SortRandom randomly reorder each worker tasks list,
+func (wts WorkerTasks) SortRandom() {
+	for w, ts := range wts {
+		L := len(ts)
+		permTs := make(Tasks, L)
+		for i, j := range rand.Perm(L) {
+			permTs[i] = ts[j]
+		}
+		wts[w] = permTs
+	}
 }
