@@ -22,8 +22,7 @@ package taskengine
 
 import (
 	"context"
-	"fmt"
-	"sync"
+	"sort"
 )
 
 // Mode of execution for each task.
@@ -37,7 +36,7 @@ const (
 
 	// For each task returns the result of all the workers:
 	// after the first success the other requests are cancelled.
-	// TODO: at most one success is expected (TBV)
+	// At most one success is expected.
 	FirstSuccessThenCancel
 
 	// For each task returns the result of all the workers.
@@ -47,39 +46,33 @@ const (
 
 // Engine contains the workers and the taks of each worker.
 type Engine struct {
-	workers map[WorkerID]*Worker
-	tasks   WorkerTasks // map[WorkerID]*Tasks
-	tidctxs map[TaskID]*taskIDContext
+	workers  map[WorkerID]*Worker
+	widtasks WorkerTasks // map[WorkerID]*Tasks
+	ctx      context.Context
 }
 
-// taskIDContext contains the information common to all the tasks with the same TaskID.
-// NOTE: the Task itself cannot be here, because
-//       different tasks with the same TaskID can have different information.
-type taskIDContext struct {
-	taskID TaskID
-
-	// number of workers that can handle the TaskID
-	workers int
-
-	// TaskID context
+type jobInput struct {
+	// task context
 	ctx context.Context
 
-	// TaskID context cancel function
+	// task cancel func
 	cancel context.CancelFunc
-
-	// result channel of the TaskID
-	resChan chan Result
-}
-
-// workerRequest struct collect the informations useful to execute a specific task.
-type workerRequest struct {
-	ctx context.Context
 
 	// task of the worker
 	task Task
 
-	// response channel for the specific TaskID
-	resChan chan Result
+	// output channel
+	outc chan *jobOutput
+}
+
+// jobOutput contains the result returned by the worker with the
+// WorkerID and instance in executing the given task.
+// A nil result indicates that the worker instance is ready to perform a task.
+type jobOutput struct {
+	wid      WorkerID
+	instance int
+	res      Result // can be nil
+	task     Task   // not used if res is nil
 }
 
 // NewEngine initialize a new engine object from the list of workers and the tasks of each worker.
@@ -87,206 +80,100 @@ type workerRequest struct {
 func NewEngine(ctx context.Context, ws []*Worker, wts WorkerTasks) (*Engine, error) {
 
 	if ctx == nil {
-		return nil, fmt.Errorf("nil context")
+		return nil, errorf("nil context")
 	}
 
 	// check workers and build a map from workerid to Worker
 	workers := map[WorkerID]*Worker{}
 	for _, w := range ws {
 		if _, ok := workers[w.WorkerID]; ok {
-			return nil, fmt.Errorf("duplicate worker: WorkerID=%q", w.WorkerID)
+			return nil, errorf("duplicate worker: WorkerID=%q", w.WorkerID)
 		}
 		if w.Instances <= 0 || w.Instances > maxInstances {
-			return nil, fmt.Errorf("instances must be in 1..%d range: WorkerID=%q", maxInstances, w.WorkerID)
+			return nil, errorf("instances must be in 1..%d range: WorkerID=%q", maxInstances, w.WorkerID)
 		}
 		if w.Work == nil {
-			return nil, fmt.Errorf("work function cannot be nil: WorkerID=%q", w.WorkerID)
+			return nil, errorf("work function cannot be nil: WorkerID=%q", w.WorkerID)
 		}
 		workers[w.WorkerID] = w
 	}
 
 	// create each taskID context
-	tidctxs := map[TaskID]*taskIDContext{}
-	tasks := WorkerTasks{}
+	widtasks := WorkerTasks{}
 
 	for wid, ts := range wts {
-
-		// for not empty task lists, check the worker exists
-		if len(ts) > 0 {
-			if _, ok := workers[wid]; !ok {
-				return nil, fmt.Errorf("tasks for undefined worker: WorkerID=%q", wid)
-			}
-			// save the task list of the worker in the engine
-			tasks[wid] = ts
+		// for empty task lists, continue
+		if len(ts) == 0 {
+			continue
 		}
-
-		// create a taskIDContext object for each different TaskID
-		for _, t := range ts {
-			tid := t.TaskID()
-			tidctx := tidctxs[tid]
-			if tidctx == nil {
-				// new TaskID found: create a new context for the task
-				tidctx = &taskIDContext{taskID: tid}
-
-				// save the context to the map
-				tidctxs[tid] = tidctx
-
-				// NOTE: in case of buffered chan, we can't create here the resChan
-				//       because we don't know yet the number of workers
-				//       that will handle the specific task
-				//       -> the buffered chan will be created after the loop
-				//       Also context and cancel function will be created after the loop
-			}
-			// Increment the number of workers that handle the task
-			// NOTE: doesn't check if the worker has already been used for the same task
-			tidctx.workers++
+		// check the worker exists
+		if _, ok := workers[wid]; !ok {
+			return nil, errorf("tasks for undefined worker: WorkerID=%q", wid)
 		}
+		// save the task list of the worker in the engine
+		widtasks[wid] = ts
 	}
 
-	// complete the creation of the taskIDContext
-	for _, tidctx := range tidctxs {
-		// create the context and cancel function
-		tidctx.ctx, tidctx.cancel = context.WithCancel(ctx)
-
-		// create the resChan buffered channel
-		tidctx.resChan = make(chan Result, tidctx.workers)
-	}
-
-	return &Engine{workers, tasks, tidctxs}, nil
+	return &Engine{
+		workers:  workers,
+		widtasks: widtasks,
+		ctx:      ctx,
+	}, nil
 }
 
-// createWorkerRequestChan returns a chan where are enqueued the worker's requests
-func (eng *Engine) createWorkerRequestChan(wid WorkerID) chan *workerRequest {
-	out := make(chan *workerRequest)
-	go func() {
-		// loop for each task of the worker
-		for _, t := range eng.tasks[wid] {
-			tidctx := eng.tidctxs[t.TaskID()]
+// String representation of jobOutput object.
+// Only for debug pourposes.
+// TODO: do not compile in production code!
+// func (o *jobOutput) String() string {
+// 	var b strings.Builder
 
-			req := &workerRequest{
-				ctx:     tidctx.ctx,
-				resChan: tidctx.resChan,
-				task:    t,
-			}
-			out <- req
-		}
-		close(out)
-	}()
-	return out
-}
-
-// getFirstSuccessOrLastError send to the out channel a single result for the taskIDContext.
-// It is the first success response or the last error response.
-func getFirstSuccessOrLastError(tidctx *taskIDContext, out chan Result) {
-	todo := true
-	count := tidctx.workers
-
-	for ; count > 0; count-- {
-		select {
-		case res := <-tidctx.resChan:
-			// if not already done,
-			// send the result if Success,
-			// or if it is the last result.
-			if todo && (res.Success() || count == 1) {
-				todo = false
-				tidctx.cancel()
-				out <- res
-			}
-		case <-tidctx.ctx.Done():
-			tidctx.cancel()
-		}
-	}
-}
-
-// getFirstSuccessThenCancel returns all the results:
-// after the first success the other requests are cancelled.
-// TODO: at most one success is expected (TBV)
-func getFirstSuccessThenCancel(tidctx *taskIDContext, out chan Result) {
-	todo := true
-	count := tidctx.workers
-
-	for ; count > 0; count-- {
-
-		res := <-tidctx.resChan
-		// if Success and not already done, cancel the context
-		if todo && res.Success() {
-			todo = false
-			tidctx.cancel()
-		}
-		out <- res
-	}
-}
-
-// getAll returns the result of all the workers.
-// Multiple success results can be returned.
-func getAllResults(tidctx *taskIDContext, out chan Result) {
-	count := tidctx.workers
-
-	for ; count > 0; count-- {
-
-		// Modified to always returns the results, eventuallly with error.
-		//
-		// select {
-		// case res := <-tidctx.resChan:
-		// 	out <- res
-		// case <-tidctx.ctx.Done():
-		// 	tidctx.cancel()
-		// }
-		res := <-tidctx.resChan
-		out <- res
-
-	}
-}
+// 	b.WriteString("jobOutput{")
+// 	if o == nil {
+// 		b.WriteString("<nil>")
+// 	} else {
+// 		fmt.Fprintf(&b, "wid=%s, inst=%d, ", o.wid, o.instance)
+// 		if o.res == nil {
+// 			fmt.Fprint(&b, "res=<nil>")
+// 		} else {
+// 			fmt.Fprintf(&b, "tid=%s, success=%v", o.task.TaskID(), o.res.Success())
+// 		}
+// 	}
+// 	b.WriteString("}")
+// 	return b.String()
+// }
 
 // Execute returns a chan that receives the Results of the workers for the input Requests.
 func (eng *Engine) Execute(mode Mode) (chan Result, error) {
 
 	if eng == nil {
-		return nil, fmt.Errorf("engine is nil")
+		return nil, errorf("nil engine")
 	}
 
-	//
+	// creates the Result channel
+	resultc := make(chan Result)
 
-	// // the first success or the last error.
-	// FirstSuccessOrLastError Mode = iota
+	// creates the *jobOutput channel
+	outputc := make(chan *jobOutput)
 
-	// // For each task returns the result of all the workers:
-	// // after the first success the other requests are cancelled.
-	// // TODO: at most one success is expected (TBV)
-	// FirstSuccessThenCancel
-
-	// // For each task returns the result of all the workers.
-	// // Multiple success results can be returned.
-	// All
-	type fnGetResults func(tidctx *taskIDContext, out chan Result)
-
-	arrGetResults := []fnGetResults{
-		getFirstSuccessOrLastError,
-		getFirstSuccessThenCancel,
-		getAllResults,
+	// creates the *jobInput chan of each worker
+	inputc := map[WorkerID](chan *jobInput){}
+	for wid := range eng.workers {
+		inputc[wid] = make(chan *jobInput)
 	}
 
-	// Creates the output channel
-	out := make(chan Result)
-
-	// Starts a goroutine for each different TaskID to wait for the result
-	var wg sync.WaitGroup
-	wg.Add(len(eng.tidctxs))
-	getResults := arrGetResults[mode]
-	for _, t := range eng.tidctxs {
-		go func(tidctx *taskIDContext) {
-			getResults(tidctx, out)
-			wg.Done()
-		}(t)
+	// creates each task context
+	taskctx := map[TaskID]context.Context{}
+	taskcancel := map[TaskID]context.CancelFunc{}
+	for _, ts := range eng.widtasks {
+		for _, t := range ts {
+			tid := t.TaskID()
+			if _, ok := taskctx[tid]; !ok {
+				ctx, cancel := context.WithCancel(eng.ctx)
+				taskctx[tid] = ctx
+				taskcancel[tid] = cancel
+			}
+		}
 	}
-
-	// Start a goroutine to close the out channel once all the output
-	// goroutines are done. This must start after the wg.Add call.
-	go func() {
-		wg.Wait()
-		//log.Println("CLOSING OUT")
-		close(out)
-	}()
 
 	// Starts the goroutines that executes the real work.
 	// For each worker it starts N goroutines, with N = Instances.
@@ -294,22 +181,177 @@ func (eng *Engine) Execute(mode Mode) (chan Result, error) {
 	// and put the output to the task result channel (contained in the request).
 	for wid, worker := range eng.workers {
 
-		// create the worker request channel of the worker
-		wreqChan := eng.createWorkerRequestChan(wid)
-
 		// for each worker instances
 		for i := 0; i < worker.Instances; i++ {
 
-			go func(w *Worker, workerInst int, reqc <-chan *workerRequest) {
-				for req := range reqc {
-					// send the worker result of the task,
-					// to the response chan of the task
-					req.resChan <- w.Work(req.ctx, workerInst, req.task)
+			go func(w *Worker, inst int, inputc <-chan *jobInput) {
+				for req := range inputc {
+					// get the worker result of the task
+					res := w.Work(req.ctx, inst, req.task)
+
+					// send the result to the output chan
+					jout := jobOutput{
+						wid:      w.WorkerID,
+						instance: inst,
+						res:      res,
+						task:     req.task,
+					}
+					req.outc <- &jout
 				}
-			}(worker, i, wreqChan)
+			}(worker, i, inputc[wid])
 		}
 	}
 
-	return out, nil
+	// each worker instances send a void output
+	// to signal it is ready to work
+	go func() {
 
+		// NOTE: According to the spec, "The iteration order over maps
+		//       is not specified and is not guaranteed to be the same
+		//       from one iteration to the next."
+		//
+		// for wid, w := range eng.workers {
+		// 	for i := 0; i < w.Instances; i++ {
+		// 		jout := jobOutput{
+		// 			wid:      wid,
+		// 			instance: i,
+		// 			res:      nil,
+		// 		}
+		// 		outputc <- &jout
+		// 	}
+		// }
+
+		// Sort the workers to make the algorithm deterministic for test porpouses.
+		// NOTE: According to the spec, "The iteration order over maps
+		//       is not specified and is not guaranteed to be the same
+		//       from one iteration to the next."
+		swids := make([]string, 0, len(eng.workers))
+		for wid := range eng.workers {
+			swids = append(swids, string(wid))
+		}
+		sort.Strings(swids)
+
+		for _, swid := range swids {
+			w := eng.workers[WorkerID(swid)]
+			for i := 0; i < w.Instances; i++ {
+				jout := jobOutput{
+					wid:      WorkerID(swid),
+					instance: i,
+					res:      nil,
+				}
+				outputc <- &jout
+			}
+		}
+	}()
+
+	go func() {
+		// clone eng.widtasks
+		widtasks := eng.widtasks.Clone()
+
+		// iter := 0
+		statusMap := newTaskStatusMap(eng.widtasks)
+
+		// for iter := 0; iter < totTasks; iter++ {
+		for !statusMap.completed() {
+
+			// iter++
+			// if iter > 100 {
+			// log.Println("MAX ITER !!!!")
+			// break
+			// }
+			// log.Printf("iter: %02d\n", iter)
+			// log.Println(tim)
+
+			// get the next output
+			o := <-outputc
+
+			// log.Println(o)
+
+			// handle result
+			if o.res != nil {
+				success := o.res.Success()
+				tid := o.task.TaskID()
+
+				// updates task info map
+				statusMap.done(tid, success)
+				status := statusMap[tid]
+
+				switch mode {
+				case FirstSuccessOrLastError:
+					if success {
+						// call cancel func for the task context
+						taskcancel[tid]()
+					}
+					if (success && status.success == 1) || (status.completed() && status.success == 0) {
+						// return the result if:
+						// - it is the first success, or
+						// - it is completed and no success was found
+						resultc <- o.res
+					}
+				case FirstSuccessThenCancel:
+					if success {
+						// call cancel func for the task context
+						taskcancel[tid]()
+					}
+					if (success && status.success == 1) || (!success && status.success == 0) {
+						// return the result if:
+						// - it is the first success, or
+						// - it is a error and no success was found
+						resultc <- o.res
+					}
+				default:
+					resultc <- o.res
+				}
+			}
+
+			// select the next task of the workerr
+			var nexttask Task
+			{
+				ts := widtasks[o.wid]
+				n := statusMap.pick(ts)
+				if n >= 0 {
+					nexttask = ts.Remove(n)
+					widtasks[o.wid] = ts
+				}
+			}
+
+			if nexttask == nil {
+				// log.Println("nexttask = <nil>")
+
+				// close the worker chan
+				// NOTE: in case of a worker with two or more instances,
+				// the close channel must be called only once. Else
+				//    panic: close of closed channel
+				if ch, ok := inputc[o.wid]; ok {
+					close(ch)
+					delete(inputc, o.wid)
+				}
+
+			} else {
+				tid := nexttask.TaskID()
+
+				// updates task info map
+				statusMap.doing(tid)
+
+				// log.Printf("nexttask = %s\n", tid)
+
+				i := &jobInput{
+					ctx:    taskctx[tid],
+					cancel: taskcancel[tid],
+					task:   nexttask,
+					outc:   outputc,
+				}
+				inputc[o.wid] <- i
+			}
+		}
+
+		// log.Println("END LOOP")
+
+		// log.Println(tim)
+
+		close(outputc)
+		close(resultc)
+	}()
+
+	return resultc, nil
 }

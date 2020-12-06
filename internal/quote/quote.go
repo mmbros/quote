@@ -233,9 +233,6 @@ func getResults(items []*SourceIsins, mode taskengine.Mode) ([]*resultGetQuote, 
 
 	}
 
-	// wts.SortTasks()
-	wts.SortRandom()
-
 	resChan, err := taskengine.Execute(context.Background(), ws, wts, mode)
 	if err != nil {
 		return nil, err

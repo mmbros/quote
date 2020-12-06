@@ -1,11 +1,7 @@
 package taskengine
 
 import (
-	"bytes"
 	"context"
-	"fmt"
-	"sort"
-	"strings"
 )
 
 // Max number of instances for each worker
@@ -41,6 +37,9 @@ type Result interface {
 }
 
 // WorkFunc is the worker function.
+// - context: the context
+// - int:     the instance id of the worker
+// - Task:    the task to be eecuted
 type WorkFunc func(context.Context, int, Task) Result
 
 // Worker is the unit (identified by WorkerID)
@@ -59,13 +58,13 @@ type Worker struct {
 	Work WorkFunc
 }
 
-// Tasks is an array of tasks
+// Tasks is an array of tasks.
 type Tasks []Task
 
 // WorkerTasks is a map representing the tasks list of each worker
 type WorkerTasks map[WorkerID]Tasks
 
-// Clone is ...
+// Clone method returns a cloned copy of the WorkerTasks object.
 func (wts WorkerTasks) Clone() WorkerTasks {
 	wts2 := WorkerTasks{}
 	for w, ts := range wts {
@@ -78,36 +77,46 @@ func (wts WorkerTasks) Clone() WorkerTasks {
 	return wts2
 }
 
-// String representation of a Tasks object
-func (ts Tasks) String() string {
-	a := make([]string, 0, len(ts))
-	for _, t := range ts {
-		a = append(a, string(t.TaskID()))
-	}
-	return "[" + strings.Join(a, ", ") + "]"
+// // String representation of a Tasks object.
+// func (ts Tasks) String() string {
+// 	a := make([]string, 0, len(ts))
+// 	for _, t := range ts {
+// 		a = append(a, string(t.TaskID()))
+// 	}
+// 	return "[" + strings.Join(a, ", ") + "]"
+// }
+
+// Remove removes the i-th task of the list.
+// It returns the rask removed.
+func (ts *Tasks) Remove(i int) Task {
+	t := (*ts)[i]
+	L1 := len(*ts) - 1
+	(*ts)[i] = (*ts)[L1]
+	(*ts) = (*ts)[:L1]
+	return t
 }
 
-// String representation of a WorkerTasks object
-func (wts WorkerTasks) String() string {
+// // String representation of a WorkerTasks object.
+// func (wts WorkerTasks) String() string {
 
-	// build the array of (the string representation of) workerID sorted alphabetically
-	wids := make([]string, 0, len(wts))
-	for wid := range wts {
-		wids = append(wids, string(wid))
-	}
-	sort.Strings(wids)
+// 	// build the array of (the string representation of) workerID sorted alphabetically
+// 	wids := make([]string, 0, len(wts))
+// 	for wid := range wts {
+// 		wids = append(wids, string(wid))
+// 	}
+// 	sort.Strings(wids)
 
-	// print to a buffer
-	buf := new(bytes.Buffer)
-	fmt.Fprintf(buf, "{\n")
-	for _, wid := range wids {
-		fmt.Fprintf(buf, "   %s : %s\n", wid, wts[WorkerID(wid)])
-	}
-	fmt.Fprintf(buf, "}\n")
+// 	// print to a buffer
+// 	buf := new(bytes.Buffer)
+// 	fmt.Fprintf(buf, "{\n")
+// 	for _, wid := range wids {
+// 		fmt.Fprintf(buf, "   %s : %s\n", wid, wts[WorkerID(wid)])
+// 	}
+// 	fmt.Fprintf(buf, "}\n")
 
-	// buffer to string
-	return buf.String()
-}
+// 	// buffer to string
+// 	return buf.String()
+// }
 
 // Execute function returns a chan that receives the Results of the workers for the input Requests.
 func Execute(ctx context.Context, workers []*Worker, tasks WorkerTasks, mode Mode) (chan Result, error) {
