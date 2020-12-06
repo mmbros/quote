@@ -50,7 +50,7 @@ Options:
     -w, --workers     int      number of workers (default 1)
     -d, --database    dns      sqlite3 database used to save the quotes
     -m, --mode        char     result mode: "1" first success or last error (default)
-                                            "S" all errors until first success 
+                                            "U" all errors until first success 
                                             "A" all 
 `
 
