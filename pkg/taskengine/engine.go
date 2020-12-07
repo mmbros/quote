@@ -44,8 +44,8 @@ const (
 	All
 )
 
-// Engine contains the workers and the taks of each worker.
-type Engine struct {
+// engine contains the workers and the taks of each worker.
+type engine struct {
 	workers  map[WorkerID]*Worker
 	widtasks WorkerTasks // map[WorkerID]*Tasks
 	ctx      context.Context
@@ -75,9 +75,9 @@ type jobOutput struct {
 	task     Task   // not used if res is nil
 }
 
-// NewEngine initialize a new engine object from the list of workers and the tasks of each worker.
+// newEngine initialize a new engine object from the list of workers and the tasks of each worker.
 // It performs some sanity check and return error in case of incongruences.
-func NewEngine(ctx context.Context, ws []*Worker, wts WorkerTasks) (*Engine, error) {
+func newEngine(ctx context.Context, ws []*Worker, wts WorkerTasks) (*engine, error) {
 
 	if ctx == nil {
 		return nil, errorf("nil context")
@@ -114,7 +114,7 @@ func NewEngine(ctx context.Context, ws []*Worker, wts WorkerTasks) (*Engine, err
 		widtasks[wid] = ts
 	}
 
-	return &Engine{
+	return &engine{
 		workers:  workers,
 		widtasks: widtasks,
 		ctx:      ctx,
@@ -143,7 +143,7 @@ func NewEngine(ctx context.Context, ws []*Worker, wts WorkerTasks) (*Engine, err
 // }
 
 // Execute returns a chan that receives the Results of the workers for the input Requests.
-func (eng *Engine) Execute(mode Mode) (chan Result, error) {
+func (eng *engine) Execute(mode Mode) (chan Result, error) {
 
 	if eng == nil {
 		return nil, errorf("nil engine")
@@ -205,37 +205,21 @@ func (eng *Engine) Execute(mode Mode) (chan Result, error) {
 	// each worker instances send a void output
 	// to signal it is ready to work
 	go func() {
-
-		// NOTE: According to the spec, "The iteration order over maps
-		//       is not specified and is not guaranteed to be the same
-		//       from one iteration to the next."
-		//
-		// for wid, w := range eng.workers {
-		// 	for i := 0; i < w.Instances; i++ {
-		// 		jout := jobOutput{
-		// 			wid:      wid,
-		// 			instance: i,
-		// 			res:      nil,
-		// 		}
-		// 		outputc <- &jout
-		// 	}
-		// }
-
 		// Sort the workers to make the algorithm deterministic for test porpouses.
 		// NOTE: According to the spec, "The iteration order over maps
 		//       is not specified and is not guaranteed to be the same
 		//       from one iteration to the next."
-		swids := make([]string, 0, len(eng.workers))
+		wids := make([]WorkerID, 0, len(eng.workers))
 		for wid := range eng.workers {
-			swids = append(swids, string(wid))
+			wids = append(wids, wid)
 		}
-		sort.Strings(swids)
+		sort.Slice(wids, func(i, j int) bool { return wids[i] < wids[j] })
 
-		for _, swid := range swids {
-			w := eng.workers[WorkerID(swid)]
+		for _, wid := range wids {
+			w := eng.workers[wid]
 			for i := 0; i < w.Instances; i++ {
 				jout := jobOutput{
-					wid:      WorkerID(swid),
+					wid:      wid,
 					instance: i,
 					res:      nil,
 				}
@@ -276,12 +260,13 @@ func (eng *Engine) Execute(mode Mode) (chan Result, error) {
 				statusMap.done(tid, success)
 				status := statusMap[tid]
 
+				if success {
+					// call cancel func for the task context
+					taskcancel[tid]()
+				}
+
 				switch mode {
 				case FirstSuccessOrLastError:
-					if success {
-						// call cancel func for the task context
-						taskcancel[tid]()
-					}
 					if (success && status.success == 1) || (status.completed() && status.success == 0) {
 						// return the result if:
 						// - it is the first success, or
@@ -289,10 +274,6 @@ func (eng *Engine) Execute(mode Mode) (chan Result, error) {
 						resultc <- o.res
 					}
 				case UntilFirstSuccess:
-					if success {
-						// call cancel func for the task context
-						taskcancel[tid]()
-					}
 					if (success && status.success == 1) || (!success && status.success == 0) {
 						// return the result if:
 						// - it is the first success, or

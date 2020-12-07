@@ -120,7 +120,7 @@ func (ts *Tasks) Remove(i int) Task {
 
 // Execute function returns a chan that receives the Results of the workers for the input Requests.
 func Execute(ctx context.Context, workers []*Worker, tasks WorkerTasks, mode Mode) (chan Result, error) {
-	eng, err := NewEngine(ctx, workers, tasks)
+	eng, err := newEngine(ctx, workers, tasks)
 	if err != nil {
 		return nil, err
 	}
