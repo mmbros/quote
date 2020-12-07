@@ -169,9 +169,10 @@ func execGet(args *appArgs, cfg *Config) error {
 		if cfg.Database != "" {
 			fmt.Printf("Database: %q\n", cfg.Database)
 		}
-		if cfg.Mode != "" {
-			fmt.Printf("Mode: %q\n", cfg.Mode)
-		}
+		// if cfg.Mode != "" {
+		// 	fmt.Printf("Mode: %q\n", cfg.Mode)
+		// }
+		fmt.Printf("Mode: %q (%d)\n", cfg.Mode, cfg.mode)
 		fmt.Println("Tasks:", jsonString(sis))
 
 		return nil
