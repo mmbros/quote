@@ -9,13 +9,13 @@
 //
 // Each Worker has a WorkFunc that performs the task.
 // Multiple instances of the same worker can be used to concurrently execute
-// different tasks assign to the  worker.
+// different tasks assign to the worker.
 //
 // The execution mode of the task is managed by the engine.Mode parameters:
 //
 // - FirstSuccessOrLastError: For each task it returns only one result: the first success or the last error. If a task can be handled by two or more workers, only the first success result is returned. The remaining job for same task are skipped.
 //
-// - FirstSuccessThenCancel: For each task returns the (not successfull) result of all the workers: after the first success the other requests are cancelled.
+// - UntilFirstSuccess: For each task returns the (not successfull) result of all the workers: after the first success the other requests are cancelled.
 //
 // - All: For each task returns the result of all the workers. Multiple success results can be returned.
 package taskengine
@@ -28,29 +28,31 @@ import (
 // Mode of execution for each task.
 type Mode int
 
-// Values of engine mode execution for each task
+// Values of mode of execution for each task.
 const (
 	// For each task returns only one result:
 	// the first success or the last error.
 	FirstSuccessOrLastError Mode = iota
 
-	// For each task returns the result of all the workers:
-	// after the first success the other requests are cancelled.
-	// At most one success is expected.
+	// For each task returns the results until the first success:
+	// after the first success the other requests are cancelled and not returned.
+	// At most one success is returned.
 	UntilFirstSuccess
 
 	// For each task returns the result of all the workers.
 	// Multiple success results can be returned.
+	// After the first success, the remaining requests are cancelled.
 	All
 )
 
-// engine contains the workers and the taks of each worker.
+// engine contains the workers and the tasks of each worker.
 type engine struct {
 	workers  map[WorkerID]*Worker
 	widtasks WorkerTasks // map[WorkerID]*Tasks
 	ctx      context.Context
 }
 
+// jobInput is the internal struct passed to a worker to execute a task.
 type jobInput struct {
 	// task context
 	ctx context.Context
