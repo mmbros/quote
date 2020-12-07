@@ -22,7 +22,6 @@ package taskengine
 
 import (
 	"context"
-	"sort"
 )
 
 // Mode of execution for each task.
@@ -47,9 +46,10 @@ const (
 
 // engine contains the workers and the tasks of each worker.
 type engine struct {
-	workers  map[WorkerID]*Worker
-	widtasks WorkerTasks // map[WorkerID]*Tasks
-	ctx      context.Context
+	workers     map[WorkerID]*Worker
+	widtasks    WorkerTasks // map[WorkerID]*Tasks
+	ctx         context.Context
+	workersList []*Worker // original workers list
 }
 
 // jobInput is the internal struct passed to a worker to execute a task.
@@ -117,9 +117,10 @@ func newEngine(ctx context.Context, ws []*Worker, wts WorkerTasks) (*engine, err
 	}
 
 	return &engine{
-		workers:  workers,
-		widtasks: widtasks,
-		ctx:      ctx,
+		workers:     workers,
+		widtasks:    widtasks,
+		ctx:         ctx,
+		workersList: ws,
 	}, nil
 }
 
@@ -181,7 +182,7 @@ func (eng *engine) Execute(mode Mode) (chan Result, error) {
 	// For each worker it starts N goroutines, with N = Instances.
 	// Each goroutine get the input from the worker request channel,
 	// and put the output to the task result channel (contained in the request).
-	for wid, worker := range eng.workers {
+	for _, worker := range eng.workersList {
 
 		// for each worker instances
 		for i := 0; i < worker.Instances; i++ {
@@ -200,25 +201,15 @@ func (eng *engine) Execute(mode Mode) (chan Result, error) {
 					}
 					req.outc <- &jout
 				}
-			}(worker, i, inputc[wid])
+			}(worker, i, inputc[worker.WorkerID])
 		}
 	}
 
 	// each worker instances send a void output
-	// to signal it is ready to work
+	// to signal it is ready to work.
 	go func() {
-		// Sort the workers to make the algorithm deterministic for test porpouses.
-		// NOTE: According to the spec, "The iteration order over maps
-		//       is not specified and is not guaranteed to be the same
-		//       from one iteration to the next."
-		wids := make([]WorkerID, 0, len(eng.workers))
-		for wid := range eng.workers {
-			wids = append(wids, wid)
-		}
-		sort.Slice(wids, func(i, j int) bool { return wids[i] < wids[j] })
-
-		for _, wid := range wids {
-			w := eng.workers[wid]
+		for _, w := range eng.workersList {
+			wid := w.WorkerID
 			for i := 0; i < w.Instances; i++ {
 				jout := jobOutput{
 					wid:      wid,
