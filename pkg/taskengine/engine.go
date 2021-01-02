@@ -278,7 +278,7 @@ func (eng *engine) Execute(mode Mode) (chan Result, error) {
 				}
 			}
 
-			// select the next task of the workerr
+			// select the next task of the worker
 			var nexttask Task
 			{
 				ts := widtasks[o.wid]
@@ -294,7 +294,7 @@ func (eng *engine) Execute(mode Mode) (chan Result, error) {
 
 				// close the worker chan
 				// NOTE: in case of a worker with two or more instances,
-				// the close channel must be called only once. Else
+				// the close of the channel must be called only once. Else
 				//    panic: close of closed channel
 				if ch, ok := inputc[o.wid]; ok {
 					close(ch)
