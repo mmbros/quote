@@ -166,7 +166,7 @@ func TestGetResults(t *testing.T) {
 			Isins:   []string{"isin1", "isin2"},
 		},
 	}
-	res, err := getResults(sis, taskengine.UntilFirstSuccess)
+	res, err := getResults(sis, taskengine.All)
 	if assert.NoError(t, err) {
 		assert.Equal(t, 3, len(res))
 		// t.Fatalf("res %v", jsonString(res))
